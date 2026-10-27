@@ -1,0 +1,6 @@
+# Minecraft Java server addresses for TCP/25565.
+# Add one IPv4/IPv6 address or CIDR subnet per line.
+# Hostnames/domains are not supported here; resolve them to IP addresses first.
+# Examples (documentation-only, reserved addresses):
+# 203.0.113.10
+# 2001:db8::10
