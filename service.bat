@@ -275,6 +275,9 @@ goto service_install_prepare
 :service_install_existing
 cls
 chcp 437 > nul
+cd /d "%~dp0"
+set "BIN_PATH=%~dp0bin\"
+set "LISTS_PATH=%~dp0lists\"
 set "existingStrategy="
 for /f "tokens=2*" %%A in ('reg query "HKLM\System\CurrentControlSet\Services\zapret" /v zapret-discord-youtube 2^>nul') do set "existingStrategy=%%B"
 if not defined existingStrategy (
