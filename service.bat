@@ -1602,9 +1602,15 @@ if /i "%UI_LANG%"=="ru" (chcp 65001 >nul) else (chcp 437 >nul)
 exit /b
 
 :ui_echo
+setlocal EnableDelayedExpansion
 set "UI_MSG_EN=%~1"
 set "UI_MSG_RU=%~2"
-if /i "%UI_LANG%"=="ru" (echo(%UI_MSG_RU%) else echo(%UI_MSG_EN%)
+if /i "!UI_LANG!"=="ru" (
+    echo(!UI_MSG_RU!
+) else (
+    echo(!UI_MSG_EN!
+)
+endlocal
 exit /b
 
 :ui_print
