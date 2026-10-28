@@ -27,6 +27,8 @@ if "%~1"=="load_game_filter" (
     exit /b
 )
 
+if "%~1"=="load_fix_settings" goto external_load_fix_settings
+
 if "%~1"=="load_user_lists" (
     call :load_user_lists
     exit /b
@@ -61,6 +63,7 @@ cls
 call :ipset_switch_status
 call :game_switch_status
 call :check_updates_switch_status
+call :fix_filters_status
 call :get_strategy_name
 
 set "menu_choice=null"
@@ -89,12 +92,13 @@ echo.
 echo   :: TOOLS
 echo      11. Run Diagnostics
 echo      12. Run Tests
+echo      13. Custom Fixes (WARP/Minecraft) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!]
 echo.
 echo   ----------------------------------------
 echo      0. Exit
 echo.
 
-set /p menu_choice=   Select option (0-12): 
+set /p menu_choice=   Select option (0-13): 
 
 if "%menu_choice%"=="1" goto service_install
 if "%menu_choice%"=="2" goto service_remove
@@ -108,6 +112,7 @@ if "%menu_choice%"=="9" goto hosts_update
 if "%menu_choice%"=="10" goto service_check_updates
 if "%menu_choice%"=="11" goto service_diagnostics
 if "%menu_choice%"=="12" goto run_tests
+if "%menu_choice%"=="13" goto fix_filters_menu
 if "%menu_choice%"=="0" exit /b
 goto menu
 
@@ -265,6 +270,47 @@ if not defined selectedFile (
     pause
     goto menu
 )
+goto service_install_prepare
+
+:service_install_existing
+cls
+chcp 437 > nul
+set "existingStrategy="
+for /f "tokens=2*" %%A in ('reg query "HKLM\System\CurrentControlSet\Services\zapret" /v zapret-discord-youtube 2^>nul') do set "existingStrategy=%%B"
+if not defined existingStrategy (
+    call :PrintRed "No previously installed strategy was found. Use Install Service first."
+    pause
+    goto menu
+)
+set "selectedFile=%~dp0!existingStrategy!.bat"
+if not exist "!selectedFile!" (
+    call :PrintRed "Previously installed strategy file was not found: !selectedFile!"
+    pause
+    goto menu
+)
+goto service_install_prepare
+
+:service_install_prepare
+call :load_fix_settings
+call :refresh_minecraft_domains
+set "ZAPRET_STRATEGY_SOURCE=!selectedFile!"
+set "ZAPRET_STRATEGY_TEMP=%TEMP%\zapret_strategy_!RANDOM!_!RANDOM!.bat"
+set "ZAPRET_MINECRAFT_FILTER_WF=!MinecraftFilterWF!"
+set "ZAPRET_WARP_FILTER_WF=!WarpFilterWF!"
+set "ZAPRET_MINECRAFT_FILTER_SKIP=!MinecraftFilterSkip!"
+set "ZAPRET_WARP_FILTER_SKIP=!WarpFilterSkip!"
+powershell -NoProfile -Command ^
+    "$strategyText = [System.IO.File]::ReadAllText($env:ZAPRET_STRATEGY_SOURCE);" ^
+    "$strategyText = $strategyText.Replace(([string][char]37 + 'MinecraftFilterWF' + [string][char]37), [string]$env:ZAPRET_MINECRAFT_FILTER_WF);" ^
+    "$strategyText = $strategyText.Replace(([string][char]37 + 'WarpFilterWF' + [string][char]37), [string]$env:ZAPRET_WARP_FILTER_WF);" ^
+    "$strategyText = $strategyText.Replace(([string][char]37 + 'MinecraftFilterSkip' + [string][char]37), [string]$env:ZAPRET_MINECRAFT_FILTER_SKIP);" ^
+    "$strategyText = $strategyText.Replace(([string][char]37 + 'WarpFilterSkip' + [string][char]37), [string]$env:ZAPRET_WARP_FILTER_SKIP);" ^
+    "[System.IO.File]::WriteAllText($env:ZAPRET_STRATEGY_TEMP, $strategyText, [System.Text.UTF8Encoding]::new($false))"
+if not exist "!ZAPRET_STRATEGY_TEMP!" (
+    call :PrintRed "Failed to prepare strategy using the current fix settings."
+    pause
+    goto menu
+)
 
 :: Args that should be followed by value
 set "args_with_value=sni host altorder"
@@ -277,7 +323,7 @@ set "BIN=%~dp0bin\"
 set "LISTS=%~dp0lists\"
 set QUOTE="
 
-for /f "tokens=*" %%a in ('type "!selectedFile!"') do (
+for /f "tokens=*" %%a in ('type "!ZAPRET_STRATEGY_TEMP!"') do (
     set "line=%%a"
     call set "line=%%line:^!=EXCL_MARK%%"
     call set "line=!line!"
@@ -356,10 +402,9 @@ sc delete %SRVCNAME% >nul 2>&1
 sc create %SRVCNAME% binPath= "\"%BIN_PATH%winws.exe\" !ARGS!" DisplayName= "zapret" start= auto
 sc description %SRVCNAME% "Zapret DPI bypass software"
 sc start %SRVCNAME%
-for %%F in ("!file%choice%!") do (
-    set "filename=%%~nF"
-)
+for %%F in ("!selectedFile!") do set "filename=%%~nF"
 reg add "HKLM\System\CurrentControlSet\Services\zapret" /v zapret-discord-youtube /t REG_SZ /d "!filename!" /f
+if exist "!ZAPRET_STRATEGY_TEMP!" del /f /q "!ZAPRET_STRATEGY_TEMP!" >nul 2>&1
 
 pause
 goto menu
@@ -898,6 +943,118 @@ exit /b
 exit /b
 
 
+:: CUSTOM FIX FILTERS ===================
+:load_fix_settings
+set "fixFiltersFile=%~dp0utils\fix_filters.ini"
+set "WarpFilterEnabled=1"
+set "MinecraftFilterEnabled=1"
+
+if not exist "%fixFiltersFile%" (
+    >"%fixFiltersFile%" (
+        echo warp=1
+        echo minecraft=1
+    )
+)
+
+for /f "usebackq tokens=1,* delims==" %%A in ("%fixFiltersFile%") do (
+    if /i "%%A"=="warp" set "WarpFilterEnabled=%%B"
+    if /i "%%A"=="minecraft" set "MinecraftFilterEnabled=%%B"
+)
+
+if not "%WarpFilterEnabled%"=="0" if not "%WarpFilterEnabled%"=="1" set "WarpFilterEnabled=1"
+if not "%MinecraftFilterEnabled%"=="0" if not "%MinecraftFilterEnabled%"=="1" set "MinecraftFilterEnabled=1"
+
+set "WarpFilterWF="
+set "WarpFilterSkip=--skip"
+if "%WarpFilterEnabled%"=="1" set "WarpFilterWF=,500,1701,4500,8095,2408"
+if "%WarpFilterEnabled%"=="1" set "WarpFilterSkip="
+
+set "MinecraftFilterWF="
+set "MinecraftFilterSkip=--skip"
+if "%MinecraftFilterEnabled%"=="1" set "MinecraftFilterWF=,25565"
+if "%MinecraftFilterEnabled%"=="1" set "MinecraftFilterSkip="
+exit /b
+
+
+:fix_filters_status
+call :load_fix_settings
+if "%WarpFilterEnabled%"=="1" (set "WarpFilterStatus=enabled") else set "WarpFilterStatus=disabled"
+if "%MinecraftFilterEnabled%"=="1" (set "MinecraftFilterStatus=enabled") else set "MinecraftFilterStatus=disabled"
+exit /b
+
+
+:save_fix_filters
+>"%fixFiltersFile%" (
+    echo warp=%WarpFilterEnabled%
+    echo minecraft=%MinecraftFilterEnabled%
+)
+exit /b
+
+
+:fix_filters_menu
+chcp 65001 > nul
+cls
+call :fix_filters_status
+
+echo CUSTOM FIX FILTERS
+echo.
+echo   1. Toggle WARP UDP ports [!WarpFilterStatus!]
+echo      Ports: UDP 500, 1701, 4500, 8095, 2408
+echo   2. Toggle Minecraft servers [!MinecraftFilterStatus!]
+echo      TCP/25565, IP list and domains from minecraft-domains.txt
+echo   3. Refresh Minecraft domain IP addresses
+echo.
+echo   0. Back
+echo.
+set "FixFiltersChoice=0"
+set /p "FixFiltersChoice=Select option (0-3, default: 0): "
+if "!FixFiltersChoice!"=="1" (
+    if "!WarpFilterEnabled!"=="1" (set "WarpFilterEnabled=0") else set "WarpFilterEnabled=1"
+    call :save_fix_filters
+    call :apply_fix_filter_changes
+    goto fix_filters_menu
+)
+if "!FixFiltersChoice!"=="2" (
+    if "!MinecraftFilterEnabled!"=="1" (set "MinecraftFilterEnabled=0") else set "MinecraftFilterEnabled=1"
+    call :save_fix_filters
+    call :apply_fix_filter_changes
+    goto fix_filters_menu
+)
+if "!FixFiltersChoice!"=="3" (
+    call :refresh_minecraft_domains
+    call :PrintGreen "Resolved Minecraft domain IP addresses: !MinecraftResolvedCount!"
+    pause
+    goto fix_filters_menu
+)
+if "!FixFiltersChoice!"=="0" goto menu
+goto fix_filters_menu
+
+
+:apply_fix_filter_changes
+call :load_fix_settings
+echo.
+call :PrintGreen "Custom fix settings saved."
+sc query "zapret" >nul 2>&1
+if !errorlevel! equ 0 (
+    set "RebuildFixService=Y"
+    set /p "RebuildFixService=Zapret service is installed. Rebuild it now with these settings? (Y/N, default Y): "
+    if "!RebuildFixService!"=="" set "RebuildFixService=Y"
+    if /i "!RebuildFixService!"=="Y" goto service_install_existing
+    call :PrintYellow "The installed service keeps its previous arguments until rebuilt."
+) else (
+    call :PrintYellow "Restart any running general*.bat strategy to apply the new settings."
+)
+pause
+exit /b
+
+
+:refresh_minecraft_domains
+set "MinecraftResolvedCount=0"
+for /f "delims=" %%N in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\refresh-minecraft-domains.ps1" 2^>nul') do set "MinecraftResolvedCount=%%N"
+if not exist "%~dp0lists\minecraft-domains-resolved.txt" type nul > "%~dp0lists\minecraft-domains-resolved.txt"
+exit /b
+
+
 :: CHECK UPDATES SWITCH =================
 :check_updates_switch_status
 chcp 437 > nul
@@ -1309,3 +1466,9 @@ if "%extracted%"=="0" (
     exit
 )
 exit /b 0
+
+
+:external_load_fix_settings
+call :load_fix_settings
+if "%MinecraftFilterEnabled%"=="1" call :refresh_minecraft_domains
+exit /b

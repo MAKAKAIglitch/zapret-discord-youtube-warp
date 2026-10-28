@@ -1,0 +1,5 @@
+# Minecraft Java server domains.
+# Add one domain name per line; DNS A/AAAA addresses are resolved before a strategy starts.
+# Lines beginning with # are comments.
+# Example:
+# play.example.net

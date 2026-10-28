@@ -6,3 +6,5 @@
 
 .vscode/
 /build/
+/utils/fix_filters.ini
+/lists/minecraft-domains-resolved.txt
