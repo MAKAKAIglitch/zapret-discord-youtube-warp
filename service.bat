@@ -35,6 +35,10 @@ if "%~1"=="load_user_lists" (
     exit /b
 )
 
+set "UI_LANG=en"
+for /f "delims=" %%L in ('powershell -NoProfile -Command "$c = [System.Globalization.CultureInfo]::CurrentUICulture.Name; try { $override = Get-WinUILanguageOverride; if ($override) { $c = [string]$override } } catch {}; if ($c -match '^(?i:ru)(-|$)') { 'ru' } else { 'en' }" 2^>nul') do set "UI_LANG=%%L"
+call :set_ui_codepage
+
 if "%1"=="admin" (
     call :check_command chcp
     call :check_command find
@@ -43,12 +47,12 @@ if "%1"=="admin" (
     
     call :load_user_lists
 
-    echo Started with admin rights
+    call :ui_echo "Started with admin rights" "Запуск с правами администратора"
 ) else (
     call :check_extracted
     call :check_command powershell
 
-    echo Requesting admin rights...
+    call :ui_echo "Requesting admin rights..." "Запрашиваются права администратора..."
     powershell -NoProfile -Command "Start-Process 'cmd.exe' -ArgumentList '/c \"\"%~f0\" admin\"' -Verb RunAs"
     exit
 )
@@ -56,7 +60,7 @@ if "%1"=="admin" (
 
 :: MENU ================================
 setlocal EnableDelayedExpansion
-title ZAPRET SERVICE MANAGER v!LOCAL_VERSION!
+if /i "!UI_LANG!"=="ru" (title МЕНЕДЖЕР ZAPRET v!LOCAL_VERSION!) else title ZAPRET SERVICE MANAGER v!LOCAL_VERSION!
 :menu
 
 cls
@@ -65,41 +69,42 @@ call :ipset_switch_status
 call :game_switch_status
 call :check_updates_switch_status
 call :fix_filters_status
+call :update_status_labels
 call :get_strategy_name
 
 set "menu_choice=null"
 
 echo.
-echo   ZAPRET SERVICE MANAGER v!LOCAL_VERSION!
+call :ui_echo "ZAPRET SERVICE MANAGER v!LOCAL_VERSION!" "МЕНЕДЖЕР ZAPRET v!LOCAL_VERSION!"
 echo.  !CurrentStrategy!
-echo   ----------------------------------------
+call :ui_echo "   ----------------------------------------" "   ----------------------------------------"
 echo.
-echo   :: SERVICE
-echo      1. Install Service
-echo      2. Remove Services
-echo      3. Check Status
+call :ui_echo "   :: SERVICE" "   :: СЛУЖБА"
+call :ui_echo "      1. Install Service" "      1. Установить службу"
+call :ui_echo "      2. Remove Services" "      2. Удалить службы"
+call :ui_echo "      3. Check Status" "      3. Проверить состояние"
 echo.
-echo   :: SETTINGS
-echo      4. Game Filter         [!GameFilterStatus!]
-echo      5. IPSet Filter        [!IPsetStatus!]
-echo      6. Auto-Update Check   [!CheckUpdatesStatus!]
-echo      7. Replace active fakes
+call :ui_echo "   :: SETTINGS" "   :: НАСТРОЙКИ"
+call :ui_echo "      4. Game Filter         [!GameFilterStatus!]" "      4. Фильтр игр          [!GameFilterStatusDisplay!]"
+call :ui_echo "      5. IPSet Filter        [!IPsetStatus!]" "      5. Фильтр IPSet        [!IPsetStatusDisplay!]"
+call :ui_echo "      6. Auto-Update Check   [!CheckUpdatesStatus!]" "      6. Автопроверка обновлений [!CheckUpdatesStatusDisplay!]"
+call :ui_echo "      7. Replace active fakes" "      7. Заменить активные фейки"
 echo.
-echo   :: UPDATES
-echo      8. Update IPSet List
-echo      9. Update Hosts File
-echo      10. Check for Updates
+call :ui_echo "   :: UPDATES" "   :: ОБНОВЛЕНИЯ"
+call :ui_echo "      8. Update IPSet List" "      8. Обновить список IPSet"
+call :ui_echo "      9. Update Hosts File" "      9. Обновить файл Hosts"
+call :ui_echo "      10. Check for Updates" "      10. Проверить обновления"
 echo.
-echo   :: TOOLS
-echo      11. Run Diagnostics
-echo      12. Run Tests
-echo      13. Custom Fixes (WARP/Minecraft/Auto) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!, Auto pick: !AutoStrategyStatus!, AutoHostlist: !AutoHostlistStatus!]
+call :ui_echo "   :: TOOLS" "   :: ИНСТРУМЕНТЫ"
+call :ui_echo "      11. Run Diagnostics" "      11. Диагностика"
+call :ui_echo "      12. Run Tests" "      12. Тесты"
+call :ui_echo "      13. Custom Fixes (WARP/Minecraft/Auto) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!, Auto pick: !AutoStrategyStatus!, AutoHostlist: !AutoHostlistStatus!]" "      13. Доп. фиксы (WARP/Minecraft/авто) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!, Автовыбор: !AutoStrategyStatus!, AutoHostlist: !AutoHostlistStatus!]"
 echo.
-echo   ----------------------------------------
-echo      0. Exit
+call :ui_echo "   ----------------------------------------" "   ----------------------------------------"
+call :ui_echo "      0. Exit" "      0. Выход"
 echo.
 
-set /p menu_choice=   Select option (0-13): 
+call :ui_prompt menu_choice "   Select option (0-13): " "   Выберите пункт (0–13): "
 
 if "%menu_choice%"=="1" goto service_install
 if "%menu_choice%"=="2" goto service_remove
@@ -138,7 +143,7 @@ exit /b
 
 :: TCP ENABLE ==========================
 :tcp_enable
-chcp 437 > nul
+call :set_ui_codepage
 netsh interface tcp show global | findstr /i "timestamps" | findstr /i "enabled" > nul || netsh interface tcp set global timestamps=enabled > nul 2>&1
 exit /b
 
@@ -146,8 +151,7 @@ exit /b
 :: STATUS ==============================
 :service_status
 cls
-chcp 437 > nul
-
+call :set_ui_codepage
 sc query "zapret" >nul 2>&1
 if !errorlevel!==0 (
     for /f "tokens=2*" %%A in ('reg query "HKLM\System\CurrentControlSet\Services\zapret" /v zapret-discord-youtube 2^>nul') do echo Service strategy installed from "%%B"
@@ -158,15 +162,15 @@ call :test_service WinDivert
 
 set "BIN_PATH=%~dp0bin\"
 if not exist "%BIN_PATH%\*.sys" (
-    call :PrintRed "WinDivert64.sys file NOT found."
+    call :ui_print PrintRed "WinDivert64.sys file NOT found." "Файл WinDivert64.sys НЕ найден."
 )
 echo:
 
 tasklist /FI "IMAGENAME eq winws.exe" | find /I "winws.exe" > nul
 if !errorlevel!==0 (
-    call :PrintGreen "Bypass (winws.exe) is RUNNING."
+    call :ui_print PrintGreen "Bypass (winws.exe) is RUNNING." "Обход (winws.exe) ЗАПУЩЕН."
 ) else (
-    call :PrintRed "Bypass (winws.exe) is NOT running."
+    call :ui_print PrintRed "Bypass (winws.exe) is NOT running." "Обход (winws.exe) НЕ запущен."
 )
 
 pause
@@ -181,16 +185,16 @@ set "ServiceStatus=%ServiceStatus: =%"
 
 if "%ServiceStatus%"=="RUNNING" (
     if "%~2"=="soft" (
-        echo "%ServiceName%" is ALREADY RUNNING as service, use "service.bat" and choose "Remove Services" first if you want to run standalone bat.
+        call :ui_echo "%ServiceName% is ALREADY RUNNING as a service. Use Remove Services before launching a strategy separately." "Служба %ServiceName% уже запущена. Перед отдельным запуском стратегии сначала выберите «Удалить службы»."
         pause
         exit /b
     ) else (
-        echo "%ServiceName%" service is RUNNING.
+        call :ui_echo "Service %ServiceName% is RUNNING." "Служба %ServiceName% запущена."
     )
 ) else if "%ServiceStatus%"=="STOP_PENDING" (
-    call :PrintYellow "!ServiceName! is STOP_PENDING, that may be caused by a conflict with another bypass. Run Diagnostics to try to fix conflicts"
+    call :ui_print PrintYellow "%ServiceName% is STOP_PENDING, that may be caused by a conflict with another bypass. Run Diagnostics to try to fix conflicts" "Служба %ServiceName% находится в состоянии STOP_PENDING; возможен конфликт с другой программой обхода. Запустите диагностику."
 ) else if not "%~2"=="soft" (
-    echo "%ServiceName%" service is NOT running.
+    call :ui_echo "Service %ServiceName% is NOT running." "Служба %ServiceName% не запущена."
 )
 
 exit /b
@@ -207,7 +211,7 @@ if !errorlevel!==0 (
     net stop %SRVCNAME%
     sc delete %SRVCNAME%
 ) else (
-    echo Service "%SRVCNAME%" is not installed.
+    call :ui_echo "Service %SRVCNAME% is not installed." "Служба %SRVCNAME% не установлена."
 )
 
 tasklist /FI "IMAGENAME eq winws.exe" | find /I "winws.exe" > nul
@@ -234,15 +238,14 @@ goto menu
 :: INSTALL =============================
 :service_install
 cls
-chcp 437 > nul
-
+call :set_ui_codepage
 :: Main
 cd /d "%~dp0"
 set "BIN_PATH=%~dp0bin\"
 set "LISTS_PATH=%~dp0lists\"
 
 :: Searching for .bat files in current folder, except files that start with "service"
-echo Pick one of the options:
+call :ui_echo "Pick one of the options:" "Выберите один из вариантов:"
 set "count=0"
 for /f "delims=" %%F in ('powershell -NoProfile -Command "Get-ChildItem -LiteralPath '.' -Filter '*.bat' | Where-Object { $_.Name -notlike 'service*' } | Sort-Object { [Regex]::Replace($_.Name, '(\d+)', { $args[0].Value.PadLeft(8, '0') }) } | ForEach-Object { $_.Name }"') do (
     set /a count+=1
@@ -250,13 +253,13 @@ for /f "delims=" %%F in ('powershell -NoProfile -Command "Get-ChildItem -Literal
     set "file!count!=%%F"
 )
 
-echo   0. Exit
+call :ui_echo "   0. Exit" "   0. Выход"
 
 echo.
 
 :: Choosing file
 set "choice="
-set /p "choice=Input option (0-!count!, default: 0): "
+call :ui_prompt choice "Input option (0-!count!, default: 0): " "Введите номер (0–!count!, по умолчанию 0): "
 if "!choice!"=="" (
     set "choice=0"
 )
@@ -267,7 +270,7 @@ if "!choice!"=="0" (
 
 set "selectedFile=!file%choice%!"
 if not defined selectedFile (
-    echo Invalid choice, exiting...
+    call :ui_echo "Invalid choice, exiting..." "Неверный выбор, выход..."
     pause
     goto menu
 )
@@ -275,20 +278,20 @@ goto service_install_prepare
 
 :service_install_existing
 cls
-chcp 437 > nul
+call :set_ui_codepage
 cd /d "%~dp0"
 set "BIN_PATH=%~dp0bin\"
 set "LISTS_PATH=%~dp0lists\"
 set "existingStrategy="
 for /f "tokens=2*" %%A in ('reg query "HKLM\System\CurrentControlSet\Services\zapret" /v zapret-discord-youtube 2^>nul') do set "existingStrategy=%%B"
 if not defined existingStrategy (
-    call :PrintRed "No previously installed strategy was found. Use Install Service first."
+    call :ui_print PrintRed "No previously installed strategy was found. Use Install Service first." "Ранее установленная стратегия не найдена. Сначала используйте «Установить службу»."
     pause
     goto menu
 )
 set "selectedFile=%~dp0!existingStrategy!.bat"
 if not exist "!selectedFile!" (
-    call :PrintRed "Previously installed strategy file was not found: !selectedFile!"
+    call :ui_print PrintRed "Previously installed strategy file was not found: !selectedFile!" "Файл ранее установленной стратегии не найден: !selectedFile!"
     pause
     goto menu
 )
@@ -313,7 +316,7 @@ powershell -NoProfile -Command ^
     "$strategyText = $strategyText.Replace(([string][char]37 + 'AutoHostlistSkip' + [string][char]37), [string]$env:ZAPRET_AUTOHOSTLIST_SKIP);" ^
     "[System.IO.File]::WriteAllText($env:ZAPRET_STRATEGY_TEMP, $strategyText, [System.Text.UTF8Encoding]::new($false))"
 if not exist "!ZAPRET_STRATEGY_TEMP!" (
-    call :PrintRed "Failed to prepare strategy using the current fix settings."
+    call :ui_print PrintRed "Failed to prepare strategy using the current fix settings." "Не удалось подготовить стратегию с текущими настройками фиксов."
     pause
     goto menu
 )
@@ -400,7 +403,7 @@ call :tcp_enable
 
 set ARGS=%args%
 call set "ARGS=%%ARGS:EXCL_MARK=^!%%"
-echo Final args: !ARGS!
+call :ui_echo "Final args: !ARGS!" "Итоговые аргументы: !ARGS!"
 set SRVCNAME=zapret
 
 net stop %SRVCNAME% >nul 2>&1
@@ -427,7 +430,7 @@ goto menu
 
 :: CHECK UPDATES =======================
 :service_check_updates
-chcp 437 > nul
+call :set_ui_codepage
 cls
 
 :: Set current version and URLs
@@ -440,7 +443,7 @@ for /f "delims=" %%A in ('powershell -NoProfile -Command "(Invoke-WebRequest -Ur
 
 :: Error handling
 if not defined GITHUB_VERSION (
-    echo Warning: failed to fetch the latest version. This warning does not affect the operation of zapret
+    call :ui_echo "Warning: failed to fetch the latest version. This warning does not affect the operation of zapret" "Предупреждение: не удалось получить последнюю версию. Это не влияет на работу zapret"
     timeout /T 9
     if "%1"=="soft" exit 
     goto menu
@@ -448,17 +451,17 @@ if not defined GITHUB_VERSION (
 
 :: Version comparison
 if "%LOCAL_VERSION%"=="%GITHUB_VERSION%" (
-    echo Latest version installed: %LOCAL_VERSION%
+    call :ui_echo "Latest version installed: %LOCAL_VERSION%" "Установлена последняя версия: %LOCAL_VERSION%"
     
     if "%1"=="soft" exit 
     pause
     goto menu
 ) 
 
-echo New version available: %GITHUB_VERSION%
-echo Release page: %GITHUB_RELEASE_URL%%GITHUB_VERSION%
+call :ui_echo "New version available: %GITHUB_VERSION%" "Доступна новая версия: %GITHUB_VERSION%"
+call :ui_echo "Release page: %GITHUB_RELEASE_URL%%GITHUB_VERSION%" "Страница релиза: %GITHUB_RELEASE_URL%%GITHUB_VERSION%"
 
-echo Opening the download page...
+call :ui_echo "Opening the download page..." "Открывается страница загрузки..."
 start "" "%GITHUB_DOWNLOAD_URL%"
 
 
@@ -470,19 +473,19 @@ goto menu
 
 :: DIAGNOSTICS =========================
 :service_diagnostics
-chcp 437 > nul
+call :set_ui_codepage
 cls
 
 :: Zapret path
-call :PrintGreen "Zapret is installed in: '%~dp0'"
+call :ui_print PrintGreen "Zapret is installed in: '%~dp0'" "Zapret установлен в: '%~dp0'"
 echo:
 
 :: Base Filtering Engine
 sc query BFE | findstr /I "RUNNING" > nul
 if !errorlevel!==0 (
-    call :PrintGreen "Base Filtering Engine check passed"
+    call :ui_print PrintGreen "Base Filtering Engine check passed" "Проверка Base Filtering Engine пройдена"
 ) else (
-    call :PrintRed "[X] Base Filtering Engine is not running. This service is required for zapret to work"
+    call :ui_print PrintRed "[X] Base Filtering Engine is not running. This service is required for zapret to work" "[X] Base Filtering Engine не запущена. Эта служба необходима для работы zapret"
 )
 echo:
 
@@ -499,24 +502,24 @@ if !proxyEnabled!==1 (
         set "proxyServer=%%B"
     )
     
-    call :PrintYellow "[?] System proxy is enabled: !proxyServer!"
-    call :PrintYellow "Make sure it's valid or disable it if you don't use a proxy"
+    call :ui_print PrintYellow "[?] System proxy is enabled: !proxyServer!" "[?] В системе включён прокси: !proxyServer!"
+    call :ui_print PrintYellow "Make sure it's valid or disable it if you don't use a proxy" "Проверьте настройки прокси или отключите его, если не используете"
 ) else (
-    call :PrintGreen "Proxy check passed"
+    call :ui_print PrintGreen "Proxy check passed" "Проверка прокси пройдена"
 )
 echo:
 
 :: TCP timestamps check
 netsh interface tcp show global | findstr /i "timestamps" | findstr /i "enabled" > nul
 if !errorlevel!==0 (
-    call :PrintGreen "TCP timestamps check passed"
+    call :ui_print PrintGreen "TCP timestamps check passed" "Проверка TCP timestamps пройдена"
 ) else (
-    call :PrintYellow "[?] TCP timestamps are disabled. Enabling timestamps..."
+    call :ui_print PrintYellow "[?] TCP timestamps are disabled. Enabling timestamps..." "[?] TCP timestamps отключены. Включение..."
     netsh interface tcp set global timestamps=enabled > nul 2>&1
     if !errorlevel!==0 (
-        call :PrintGreen "TCP timestamps successfully enabled"
+        call :ui_print PrintGreen "TCP timestamps successfully enabled" "TCP timestamps успешно включены"
     ) else (
-        call :PrintRed "[X] Failed to enable TCP timestamps"
+        call :ui_print PrintRed "[X] Failed to enable TCP timestamps" "[X] Не удалось включить TCP timestamps"
     )
 )
 echo:
@@ -524,30 +527,30 @@ echo:
 :: AdguardSvc.exe
 tasklist /FI "IMAGENAME eq AdguardSvc.exe" | find /I "AdguardSvc.exe" > nul
 if !errorlevel!==0 (
-    call :PrintRed "[X] Adguard process found. Adguard may cause problems with Discord"
+    call :ui_print PrintRed "[X] Adguard process found. Adguard may cause problems with Discord" "[X] Обнаружен процесс Adguard. Он может вызывать проблемы с Discord"
     call :PrintRed "https://github.com/Flowseal/zapret-discord-youtube/issues/417"
 ) else (
-    call :PrintGreen "Adguard check passed"
+    call :ui_print PrintGreen "Adguard check passed" "Проверка Adguard пройдена"
 )
 echo:
 
 :: Killer
 sc query | findstr /I "Killer" > nul
 if !errorlevel!==0 (
-    call :PrintRed "[X] Killer services found. Killer conflicts with zapret"
+    call :ui_print PrintRed "[X] Killer services found. Killer conflicts with zapret" "[X] Обнаружены службы Killer, конфликтующие с zapret"
     call :PrintRed "https://github.com/Flowseal/zapret-discord-youtube/issues/2512#issuecomment-2821119513"
 ) else (
-    call :PrintGreen "Killer check passed"
+    call :ui_print PrintGreen "Killer check passed" "Проверка Killer пройдена"
 )
 echo:
 
 :: Intel Connectivity Network Service
 sc query | findstr /I "Intel" | findstr /I "Connectivity" | findstr /I "Network" > nul
 if !errorlevel!==0 (
-    call :PrintRed "[X] Intel Connectivity Network Service found. It conflicts with zapret"
+    call :ui_print PrintRed "[X] Intel Connectivity Network Service found. It conflicts with zapret" "[X] Обнаружена служба Intel Connectivity Network Service, конфликтующая с zapret"
     call :PrintRed "https://github.com/ValdikSS/GoodbyeDPI/issues/541#issuecomment-2661670982"
 ) else (
-    call :PrintGreen "Intel Connectivity check passed"
+    call :ui_print PrintGreen "Intel Connectivity check passed" "Проверка Intel Connectivity пройдена"
 )
 echo:
 
@@ -564,30 +567,30 @@ if !errorlevel!==0 (
 )
 
 if !checkpointFound!==1 (
-    call :PrintRed "[X] Check Point services found. Check Point conflicts with zapret"
-    call :PrintRed "Try to uninstall Check Point"
+    call :ui_print PrintRed "[X] Check Point services found. Check Point conflicts with zapret" "[X] Обнаружены службы Check Point, конфликтующие с zapret"
+    call :ui_print PrintRed "Try to uninstall Check Point" "Попробуйте удалить Check Point"
 ) else (
-    call :PrintGreen "Check Point check passed"
+    call :ui_print PrintGreen "Check Point check passed" "Проверка Check Point пройдена"
 )
 echo:
 
 :: SmartByte
 sc query | findstr /I "SmartByte" > nul
 if !errorlevel!==0 (
-    call :PrintRed "[X] SmartByte services found. SmartByte conflicts with zapret"
-    call :PrintRed "Try to uninstall or disable SmartByte through services.msc"
+    call :ui_print PrintRed "[X] SmartByte services found. SmartByte conflicts with zapret" "[X] Обнаружены службы SmartByte, конфликтующие с zapret"
+    call :ui_print PrintRed "Try to uninstall or disable SmartByte through services.msc" "Попробуйте удалить или отключить SmartByte через services.msc"
 ) else (
-    call :PrintGreen "SmartByte check passed"
+    call :ui_print PrintGreen "SmartByte check passed" "Проверка SmartByte пройдена"
 )
 echo:
 
 :: Cyrillic path
 powershell -NoProfile -Command "if ('%~dp0' -match '[\u0430-\u044F\u0410-\u042F\u0451\u0401]') { exit 0 } else { exit 1 }"
 if !errorlevel!==0 (
-    call :PrintYellow "[?] The path where Zapret is installed contains Cyrillic characters"
-    call :PrintYellow "If bypass doesn't work, try to move Zapret to another directory, for example in C:\zapret"
+    call :ui_print PrintYellow "[?] The path where Zapret is installed contains Cyrillic characters" "[?] Путь к папке Zapret содержит кириллические символы"
+    call :ui_print PrintYellow "If bypass doesn't work, try to move Zapret to another directory, for example in C:\zapret" "Если обход не работает, перенесите Zapret в другой каталог, например C:\zapret"
 ) else (
-    call :PrintGreen "Cyrillic path check passed"
+    call :ui_print PrintGreen "Cyrillic path check passed" "Проверка кириллических символов в пути пройдена"
 )
 echo:
 
@@ -595,20 +598,20 @@ echo:
 if defined OneDrive (
     echo %~dp0\ | findstr /I /C:"%OneDrive%\\" > nul
     if !errorlevel!==0 (
-        call :PrintRed "[X] Zapret is installed in a OneDrive folder"
-        call :PrintRed "If bypass doesn't work, try to move Zapret to another directory, for example in C:\zapret"
+        call :ui_print PrintRed "[X] Zapret is installed in a OneDrive folder" "[X] Zapret установлен в папке OneDrive"
+        call :ui_print PrintRed "If bypass doesn't work, try to move Zapret to another directory, for example in C:\zapret" "Если обход не работает, перенесите Zapret в другой каталог, например C:\zapret"
     ) else (
-        call :PrintGreen "OneDrive check passed"
+        call :ui_print PrintGreen "OneDrive check passed" "Проверка OneDrive пройдена"
     )
 ) else (
-    call :PrintGreen "OneDrive check passed"
+    call :ui_print PrintGreen "OneDrive check passed" "Проверка OneDrive пройдена"
 )
 echo:
 
 :: WinDivert64.sys file
 set "BIN_PATH=%~dp0bin\"
 if not exist "%BIN_PATH%\*.sys" (
-    call :PrintRed "WinDivert64.sys file NOT found."
+    call :ui_print PrintRed "WinDivert64.sys file NOT found." "Файл WinDivert64.sys НЕ найден."
     echo:
 )
 
@@ -623,10 +626,10 @@ if !errorlevel!==0 (
             set "VPN_SERVICES=!VPN_SERVICES!,%%A"
         )
     )
-    call :PrintYellow "[?] VPN services found:!VPN_SERVICES!. Some VPNs can conflict with zapret"
-    call :PrintYellow "Make sure that all VPNs are disabled"
+    call :ui_print PrintYellow "[?] VPN services found:!VPN_SERVICES!. Some VPNs can conflict with zapret" "[?] Найдены VPN-службы: !VPN_SERVICES!. Некоторые VPN могут конфликтовать с zapret"
+    call :ui_print PrintYellow "Make sure that all VPNs are disabled" "Убедитесь, что все VPN отключены"
 ) else (
-    call :PrintGreen "VPN check passed"
+    call :ui_print PrintGreen "VPN check passed" "Проверка VPN пройдена"
 )
 echo:
 
@@ -638,10 +641,10 @@ for /f "delims=" %%a in ('powershell -NoProfile -Command "Get-ChildItem -Recurse
     )
 )
 if !dohfound!==0 (
-    call :PrintYellow "[?] Make sure you have configured secure DNS in a browser with some non-default DNS service provider,"
-    call :PrintYellow "If you use Windows 11 you can configure encrypted DNS in the Settings to hide this warning"
+    call :ui_print PrintYellow "[?] Make sure you have configured secure DNS in a browser with some non-default DNS service provider," "[?] Настройте защищённый DNS в браузере, выбрав стороннего DNS-провайдера,"
+    call :ui_print PrintYellow "If you use Windows 11 you can configure encrypted DNS in the Settings to hide this warning" "В Windows 11 можно настроить шифрованный DNS в параметрах, чтобы убрать это предупреждение"
 ) else (
-    call :PrintGreen "Secure DNS check passed"
+    call :ui_print PrintGreen "Secure DNS check passed" "Проверка защищённого DNS пройдена"
 )
 echo:
 
@@ -652,7 +655,7 @@ if exist "%hostsFile%" (
     >nul 2>&1 findstr /I "youtube.com" "%hostsFile%" && set "yt_found=1"
     >nul 2>&1 findstr /I "youtu.be" "%hostsFile%" && set "yt_found=1"
     if !yt_found!==1 (
-        call :PrintYellow "[?] Your hosts file contains entries for youtube.com or youtu.be. This may cause problems with YouTube access"
+        call :ui_print PrintYellow "[?] Your hosts file contains entries for youtube.com or youtu.be. This may cause problems with YouTube access" "[?] В файле Hosts есть записи youtube.com или youtu.be. Это может мешать открытию YouTube"
     )
 )
 
@@ -664,48 +667,49 @@ sc query "WinDivert" | findstr /I "RUNNING STOP_PENDING" > nul
 set "windivert_running=!errorlevel!"
 
 if !winws_running! neq 0 if !windivert_running!==0 (
-    call :PrintYellow "[?] winws.exe is not running but WinDivert service is active. Attempting to delete WinDivert..."
+    call :ui_print PrintYellow "[?] winws.exe is not running but WinDivert service is active. Attempting to delete WinDivert..." "[?] winws.exe не запущен, но служба WinDivert активна. Попытка удалить WinDivert..."
     
     net stop "WinDivert" >nul 2>&1
     sc delete "WinDivert" >nul 2>&1
     sc query "WinDivert" >nul 2>&1
     if !errorlevel!==0 (
-        call :PrintRed "[X] Failed to delete WinDivert. Checking for conflicting services..."
+        call :ui_print PrintRed "[X] Failed to delete WinDivert. Checking for conflicting services..." "[X] Не удалось удалить WinDivert. Проверка конфликтующих служб..."
         
         set "conflicting_services=GoodbyeDPI"
         set "found_conflict=0"
         
         for %%s in (!conflicting_services!) do (
-            sc query "%%s" >nul 2>&1
+            set "conflictingService=%%s"
+            sc query "!conflictingService!" >nul 2>&1
             if !errorlevel!==0 (
-                call :PrintYellow "[?] Found conflicting service: %%s. Stopping and removing..."
-                net stop "%%s" >nul 2>&1
-                sc delete "%%s" >nul 2>&1
+                call :ui_print PrintYellow "[?] Found conflicting service: !conflictingService!. Stopping and removing..." "[?] Найдена конфликтующая служба: !conflictingService!. Остановка и удаление..."
+                net stop "!conflictingService!" >nul 2>&1
+                sc delete "!conflictingService!" >nul 2>&1
                 if !errorlevel!==0 (
-                    call :PrintGreen "Successfully removed service: %%s"
+                    call :ui_print PrintGreen "Successfully removed service: !conflictingService!" "Служба !conflictingService! успешно удалена"
                 ) else (
-                    call :PrintRed "[X] Failed to remove service: %%s"
+                    call :ui_print PrintRed "[X] Failed to remove service: !conflictingService!" "[X] Не удалось удалить службу !conflictingService!"
                 )
                 set "found_conflict=1"
             )
         )
         
         if !found_conflict!==0 (
-            call :PrintRed "[X] No conflicting services found. Check manually if any other bypass is using WinDivert."
+            call :ui_print PrintRed "[X] No conflicting services found. Check manually if any other bypass is using WinDivert." "[X] Конфликтующие службы не найдены. Проверьте, не использует ли WinDivert другая программа обхода."
         ) else (
-            call :PrintYellow "[?] Attempting to delete WinDivert again..."
+            call :ui_print PrintYellow "[?] Attempting to delete WinDivert again..." "[?] Повторная попытка удалить WinDivert..."
 
             net stop "WinDivert" >nul 2>&1
             sc delete "WinDivert" >nul 2>&1
             sc query "WinDivert" >nul 2>&1
             if !errorlevel! neq 0 (
-                call :PrintGreen "WinDivert successfully deleted after removing conflicting services"
+                call :ui_print PrintGreen "WinDivert successfully deleted after removing conflicting services" "WinDivert успешно удалён после удаления конфликтующих служб"
             ) else (
-                call :PrintRed "[X] WinDivert still cannot be deleted. Check manually if any other bypass is using WinDivert."
+                call :ui_print PrintRed "[X] WinDivert still cannot be deleted. Check manually if any other bypass is using WinDivert." "[X] WinDivert всё ещё не удаётся удалить. Проверьте, не использует ли WinDivert другая программа обхода."
             )
         )
     ) else (
-        call :PrintGreen "WinDivert successfully removed"
+        call :ui_print PrintGreen "WinDivert successfully removed" "WinDivert успешно удалён"
     )
     
     echo:
@@ -729,22 +733,22 @@ for %%s in (!conflicting_services!) do (
 )
 
 if !found_any_conflict!==1 (
-    call :PrintRed "[X] Conflicting bypass services found: !found_conflicts!"
+    call :ui_print PrintRed "[X] Conflicting bypass services found: !found_conflicts!" "[X] Обнаружены конфликтующие службы обхода: !found_conflicts!"
     
     set "CHOICE="
-    set /p "CHOICE=Do you want to remove these conflicting services? (Y/N) (default: N) "
+    call :ui_prompt CHOICE "Do you want to remove these conflicting services? (Y/N) (default: N) " "Удалить эти конфликтующие службы? (Y/N, по умолчанию N) "
     if "!CHOICE!"=="" set "CHOICE=N"
     if "!CHOICE!"=="y" set "CHOICE=Y"
     
     if /i "!CHOICE!"=="Y" (
         for %%s in (!found_conflicts!) do (
-            call :PrintYellow "Stopping and removing service: %%s"
+            call :ui_print PrintYellow "Stopping and removing service: %%s" "Остановка и удаление службы: %%s"
             net stop "%%s" >nul 2>&1
             sc delete "%%s" >nul 2>&1
             if !errorlevel!==0 (
-                call :PrintGreen "Successfully removed service: %%s"
+                call :ui_print PrintGreen "Successfully removed service: %%s" "Служба успешно удалена: %%s"
             ) else (
-                call :PrintRed "[X] Failed to remove service: %%s"
+                call :ui_print PrintRed "[X] Failed to remove service: %%s" "[X] Не удалось удалить службу: %%s"
             )
         )
 
@@ -759,7 +763,7 @@ if !found_any_conflict!==1 (
 
 :: Discord cache clearing
 set "CHOICE="
-set /p "CHOICE=Do you want to clear the Discord cache (Stable, PTB, Canary, Development)? (Y/N) (default: Y) "
+call :ui_prompt CHOICE "Do you want to clear the Discord cache (Stable, PTB, Canary, Development)? (Y/N) (default: Y) " "Очистить кэш Discord (Stable, PTB, Canary, Development)? (Y/N, по умолчанию Y) "
 if "!CHOICE!"=="" set "CHOICE=Y"
 if "!CHOICE!"=="y" set "CHOICE=Y"
 
@@ -792,8 +796,7 @@ goto menu
 
 :: GAME SWITCH ========================
 :game_switch_status
-chcp 437 > nul
-
+call :set_ui_codepage
 set "gameFlagFile=%~dp0utils\game_filter.enabled"
 set "GameFilterMode=disabled"
 set "GameFilterTCPRange=1024-65535"
@@ -845,24 +848,24 @@ exit /b
 
 
 :game_switch
-chcp 437 > nul
+call :set_ui_codepage
 cls
 call :game_switch_status
 
-echo Select game filter option:
+call :ui_echo "Select game filter option:" "Выберите параметр игрового фильтра:"
 if "%GameFilterMode%"=="disabled"   (echo   1. * Disable) else      echo   1.   Disable
 if "%GameFilterMode%"=="all"        (echo   2. * TCP and UDP) else  echo   2.   TCP and UDP
 if "%GameFilterMode%"=="tcp"        (echo   3. * TCP) else          echo   3.   TCP
 if "%GameFilterMode%"=="udp"        (echo   4. * UDP) else          echo   4.   UDP
 echo.
-echo   5. Change TCP port range (current: %GameFilterTCPRange%)
-echo   6. Change UDP port range (current: %GameFilterUDPRange%)
-echo   7. Change TCP and UDP port ranges
+call :ui_echo "   5. Change TCP port range (current: %GameFilterTCPRange%)" "   5. Изменить диапазон TCP-портов (сейчас: %GameFilterTCPRange%)"
+call :ui_echo "   6. Change UDP port range (current: %GameFilterUDPRange%)" "   6. Изменить диапазон UDP-портов (сейчас: %GameFilterUDPRange%)"
+call :ui_echo "   7. Change TCP and UDP port ranges" "   7. Изменить диапазоны TCP и UDP"
 echo.
-echo.  0. Exit
+call :ui_echo "  0. Exit" "  0. Выход"
 echo.
 set "GameFilterChoice=0"
-set /p "GameFilterChoice=Select option (0-7, default: 0): "
+call :ui_prompt GameFilterChoice "Select option (0-7, default: 0): " "Выберите пункт (0–7, по умолчанию 0): "
 if "%GameFilterChoice%"=="" set "GameFilterChoice=0"
 
 if "%GameFilterChoice%"=="1" (
@@ -885,7 +888,7 @@ if "%GameFilterChoice%"=="1" (
 
 echo.
 call :save_game_filter_settings
-call :PrintYellow "Restart the zapret to apply the changes"
+call :ui_print PrintYellow "Restart the zapret to apply the changes" "Перезапустите zapret, чтобы применить изменения"
 pause
 goto game_switch
 
@@ -894,11 +897,11 @@ goto game_switch
 set "GameFilterRangeInput="
 
 echo.
-echo Changing ports for %~1 (example: 1024-1934,1936-65535, default: 1024-65535)
-set /p "GameFilterRangeInput=Enter ports/ranges: "
+call :ui_echo "Changing ports for %~1 (example: 1024-1934,1936-65535, default: 1024-65535)" "Изменение портов для %~1 (пример: 1024-1934,1936-65535; по умолчанию: 1024-65535)"
+call :ui_prompt GameFilterRangeInput "Enter ports/ranges: " "Введите порты/диапазоны: "
 call :validate_game_filter_range "%GameFilterRangeInput%"
 if not defined ValidatedGameFilterRange (
-    call :PrintRed "Invalid input. Please enter valid ports/ranges."
+    call :ui_print PrintRed "Invalid input. Please enter valid ports/ranges." "Неверный ввод. Укажите корректные порты/диапазоны."
     pause
     goto game_switch
 )
@@ -1009,6 +1012,34 @@ if not exist "%~dp0lists\hostlist-auto.txt" (
 exit /b
 
 
+:update_status_labels
+set "GameFilterStatusDisplay=!GameFilterStatus!"
+set "IPsetStatusDisplay=!IPsetStatus!"
+set "CheckUpdatesStatusDisplay=!CheckUpdatesStatus!"
+set "WarpFilterStatusDisplay=!WarpFilterStatus!"
+set "MinecraftFilterStatusDisplay=!MinecraftFilterStatus!"
+set "AutoStrategyStatusDisplay=!AutoStrategyStatus!"
+set "AutoHostlistStatusDisplay=!AutoHostlistStatus!"
+if /i "%UI_LANG%"=="ru" (
+    if /i "!GameFilterStatus!"=="enabled" set "GameFilterStatusDisplay=включён"
+    if /i "!GameFilterStatus!"=="disabled" set "GameFilterStatusDisplay=выключен"
+    if /i "!IPsetStatus!"=="loaded" set "IPsetStatusDisplay=загружен"
+    if /i "!IPsetStatus!"=="none" set "IPsetStatusDisplay=ограничен"
+    if /i "!IPsetStatus!"=="any" set "IPsetStatusDisplay=все IP"
+    if /i "!CheckUpdatesStatus!"=="enabled" set "CheckUpdatesStatusDisplay=включена"
+    if /i "!CheckUpdatesStatus!"=="disabled" set "CheckUpdatesStatusDisplay=выключена"
+    if /i "!WarpFilterStatus!"=="enabled" set "WarpFilterStatusDisplay=включён"
+    if /i "!WarpFilterStatus!"=="disabled" set "WarpFilterStatusDisplay=выключен"
+    if /i "!MinecraftFilterStatus!"=="enabled" set "MinecraftFilterStatusDisplay=включён"
+    if /i "!MinecraftFilterStatus!"=="disabled" set "MinecraftFilterStatusDisplay=выключен"
+    if /i "!AutoStrategyStatus!"=="enabled" set "AutoStrategyStatusDisplay=включён"
+    if /i "!AutoStrategyStatus!"=="disabled" set "AutoStrategyStatusDisplay=выключен"
+    if /i "!AutoHostlistStatus!"=="enabled" set "AutoHostlistStatusDisplay=включён"
+    if /i "!AutoHostlistStatus!"=="disabled" set "AutoHostlistStatusDisplay=выключен"
+)
+exit /b
+
+
 :fix_filters_status
 call :load_fix_settings
 if "%WarpFilterEnabled%"=="1" (set "WarpFilterStatus=enabled") else set "WarpFilterStatus=disabled"
@@ -1032,23 +1063,24 @@ exit /b
 chcp 65001 > nul
 cls
 call :fix_filters_status
+call :update_status_labels
 
-echo CUSTOM FIX FILTERS
+call :ui_echo "CUSTOM FIX FILTERS" "ДОПОЛНИТЕЛЬНЫЕ ФИКСЫ"
 echo.
-echo   1. Toggle WARP UDP ports [!WarpFilterStatus!]
-echo      Ports: UDP 500, 1701, 4500, 8095, 2408
-echo   2. Toggle Minecraft servers [!MinecraftFilterStatus!]
-echo      TCP/25565, IP list and domains from minecraft-domains.txt
-echo   3. Refresh Minecraft domain IP addresses
-echo   4. Auto-pick strategy while idle [!AutoStrategyStatus!]
-echo      Tests strategies only after 15 minutes of user inactivity
-echo   5. AutoHostlist [!AutoHostlistStatus!]
-echo      Dynamically learns blocked TCP/443 domains into hostlist-auto.txt
+call :ui_echo "   1. Toggle WARP UDP ports [!WarpFilterStatus!]" "   1. Включить/выключить UDP-порты WARP [!WarpFilterStatusDisplay!]"
+call :ui_echo "      Ports: UDP 500, 1701, 4500, 8095, 2408" "      Порты: UDP 500, 1701, 4500, 8095, 2408"
+call :ui_echo "   2. Toggle Minecraft servers [!MinecraftFilterStatus!]" "   2. Включить/выключить фильтр Minecraft [!MinecraftFilterStatusDisplay!]"
+call :ui_echo "      TCP/25565, IP list and domains from minecraft-domains.txt" "      TCP/25565, IP-список и домены из minecraft-domains.txt"
+call :ui_echo "   3. Refresh Minecraft domain IP addresses" "   3. Обновить IP-адреса доменов Minecraft"
+call :ui_echo "   4. Auto-pick strategy while idle [!AutoStrategyStatus!]" "   4. Автоподбор стратегии в простое [!AutoStrategyStatusDisplay!]"
+call :ui_echo "      Tests strategies only after 15 minutes of user inactivity" "      Проверка после 15 минут бездействия пользователя"
+call :ui_echo "   5. AutoHostlist [!AutoHostlistStatus!]" "   5. AutoHostlist [!AutoHostlistStatusDisplay!]"
+call :ui_echo "      Dynamically learns blocked TCP/443 domains into hostlist-auto.txt" "      Автоматически добавляет заблокированные домены TCP/443 в hostlist-auto.txt"
 echo.
-echo   0. Back
+call :ui_echo "   0. Back" "   0. Назад"
 echo.
 set "FixFiltersChoice=0"
-set /p "FixFiltersChoice=Select option (0-5, default: 0): "
+call :ui_prompt FixFiltersChoice "Select option (0-5, default: 0): " "Выберите пункт (0–5, по умолчанию 0): "
 if "!FixFiltersChoice!"=="1" (
     if "!WarpFilterEnabled!"=="1" (set "WarpFilterEnabled=0") else set "WarpFilterEnabled=1"
     call :save_fix_filters
@@ -1063,7 +1095,7 @@ if "!FixFiltersChoice!"=="2" (
 )
 if "!FixFiltersChoice!"=="3" (
     call :refresh_minecraft_domains
-    call :PrintGreen "Resolved Minecraft domain IP addresses: !MinecraftResolvedCount!"
+    call :ui_print PrintGreen "Resolved Minecraft domain IP addresses: !MinecraftResolvedCount!" "Количество разрешённых IP-адресов Minecraft-доменов: !MinecraftResolvedCount!"
     pause
     goto fix_filters_menu
 )
@@ -1089,16 +1121,16 @@ if "%AutoStrategyEnabled%"=="1" (
     if errorlevel 1 (
         set "AutoStrategyEnabled=0"
         call :save_fix_filters
-        call :PrintRed "Could not register the idle auto-strategy task; it has been disabled."
+        call :ui_print PrintRed "Could not register the idle auto-strategy task; it has been disabled." "Не удалось зарегистрировать задачу автоподбора стратегии; функция отключена."
     ) else (
-        call :PrintGreen "Idle auto-strategy task enabled. It checks every 30 minutes."
+        call :ui_print PrintGreen "Idle auto-strategy task enabled. It checks every 30 minutes." "Автоподбор стратегии в простое включён. Проверка запускается каждые 30 минут."
     )
 ) else (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\manage-auto-strategy-task.ps1" -Action Disable
     if errorlevel 1 (
-        call :PrintYellow "Could not remove the idle auto-strategy task."
+        call :ui_print PrintYellow "Could not remove the idle auto-strategy task." "Не удалось удалить задачу автоподбора стратегии."
     ) else (
-        call :PrintGreen "Idle auto-strategy task disabled."
+        call :ui_print PrintGreen "Idle auto-strategy task disabled." "Автоподбор стратегии в простое отключён."
     )
 )
 pause
@@ -1108,16 +1140,16 @@ exit /b
 :apply_fix_filter_changes
 call :load_fix_settings
 echo.
-call :PrintGreen "Custom fix settings saved."
+call :ui_print PrintGreen "Custom fix settings saved." "Настройки дополнительных фиксов сохранены."
 sc query "zapret" >nul 2>&1
 if !errorlevel! equ 0 (
     set "RebuildFixService=Y"
-    set /p "RebuildFixService=Zapret service is installed. Rebuild it now with these settings? (Y/N, default Y): "
+    call :ui_prompt RebuildFixService "Zapret service is installed. Rebuild it now with these settings? (Y/N, default Y): " "Zapret установлена как служба. Пересобрать её с этими настройками? (Y/N, по умолчанию Y): "
     if "!RebuildFixService!"=="" set "RebuildFixService=Y"
     if /i "!RebuildFixService!"=="Y" goto service_install_existing
-    call :PrintYellow "The installed service keeps its previous arguments until rebuilt."
+    call :ui_print PrintYellow "The installed service keeps its previous arguments until rebuilt." "Установленная служба сохранит прежние параметры, пока её не пересобрать."
 ) else (
-    call :PrintYellow "Restart any running general*.bat strategy to apply the new settings."
+    call :ui_print PrintYellow "Restart any running general*.bat strategy to apply the new settings." "Перезапустите запущенную стратегию general*.bat, чтобы применить новые настройки."
 )
 pause
 exit /b
@@ -1132,8 +1164,7 @@ exit /b
 
 :: CHECK UPDATES SWITCH =================
 :check_updates_switch_status
-chcp 437 > nul
-
+call :set_ui_codepage
 set "checkUpdatesFlag=%~dp0utils\check_updates.enabled"
 
 if exist "%checkUpdatesFlag%" (
@@ -1145,14 +1176,14 @@ exit /b
 
 
 :check_updates_switch
-chcp 437 > nul
+call :set_ui_codepage
 cls
 
 if not exist "%checkUpdatesFlag%" (
-    echo Enabling check updates...
+    call :ui_echo "Enabling check updates..." "Включение проверки обновлений..."
     echo ENABLED > "%checkUpdatesFlag%"
 ) else (
-    echo Disabling check updates...
+    call :ui_echo "Disabling check updates..." "Отключение проверки обновлений..."
     del /f /q "%checkUpdatesFlag%"
 )
 
@@ -1162,7 +1193,7 @@ goto menu
 
 :: REPLACE ACTIVE FAKES =================
 :replace_active_fakes
-chcp 437 > nul
+call :set_ui_codepage
 cls
 
 set "BIN_PATH=%~dp0bin\"
@@ -1175,7 +1206,7 @@ set "current_discord_fake=(not found)"
 set "current_game_fake=(not found)"
 
 if not exist "%BIN_PATH%" (
-    echo Error: bin folder not found.
+    call :ui_echo "Error: bin folder not found." "Ошибка: папка bin не найдена."
     pause
     goto menu
 )
@@ -1196,7 +1227,7 @@ for /f "tokens=1,2,3 delims=|" %%A in ('powershell -NoProfile -Command "foreach 
 popd
 
 if !fake_count! EQU 0 (
-    echo No .bin files were found in the bin folder.
+    call :ui_echo "No .bin files were found in the bin folder." "В папке bin не найдено файлов .bin."
     pause
     goto menu
 )
@@ -1208,24 +1239,24 @@ for /l %%N in (1,1,!fake_count!) do (
 
 :replace_active_fakes_prompt
 echo.
-echo Enter the fake type number and the fake file number to replace it with.
-echo Example: 1 4 (replaces Discord UDP with fake file under number 4)
-echo          2 1 (replaces GameFilter UDP with fake file under number 1)
+call :ui_echo "Enter the fake type number and the fake file number to replace it with." "Введите номер типа фейка и номер файла, на который его заменить."
+call :ui_echo "Example: 1 4 (replaces Discord UDP with fake file under number 4)" "Пример: 1 4 (заменить Discord UDP фейком под номером 4)"
+call :ui_echo "          2 1 (replaces GameFilter UDP with fake file under number 1)" "          2 1 (заменить GameFilter UDP фейком под номером 1)"
 echo.
-echo Press ENTER or 0 to return.
+call :ui_echo "Press ENTER or 0 to return." "Нажмите ENTER или 0 для возврата."
 echo.
-echo   ----------------------------------------
+call :ui_echo "   ----------------------------------------" "   ----------------------------------------"
 echo.
-echo Fake types:
-echo   1. Discord UDP     (current: !current_discord_fake!)
-echo   2. GameFilter UDP  (current: !current_game_fake!)
+call :ui_echo "Fake types:" "Типы фейков:"
+call :ui_echo "   1. Discord UDP     (current: !current_discord_fake!)" "   1. Discord UDP     (сейчас: !current_discord_fake!)"
+call :ui_echo "   2. GameFilter UDP  (current: !current_game_fake!)" "   2. GameFilter UDP  (сейчас: !current_game_fake!)"
 echo.
-echo Fake files:
+call :ui_echo "Fake files:" "Файлы фейков:"
 for /l %%N in (1,1,!fake_count!) do echo   %%N. !fake_name%%N!
 echo.
 
 set "replace_choice="
-set /p "replace_choice=Enter choice: "
+call :ui_prompt replace_choice "Enter choice: " "Введите выбор: "
 if not defined replace_choice goto menu
 if "!replace_choice!"=="0" goto menu
 
@@ -1242,7 +1273,7 @@ if "!fake_type!"=="1" (
 ) else if "!fake_type!"=="2" (
     set "active_file=%BIN_PATH%ACTIVE_GAME_UDP.bin"
 ) else (
-    echo Invalid fake type.
+    call :ui_echo "Invalid fake type." "Неверный тип фейка."
     pause
     cls
     goto replace_active_fakes_prompt
@@ -1251,7 +1282,7 @@ if "!fake_type!"=="1" (
 set "source_file="
 for /l %%N in (1,1,!fake_count!) do if "%%N"=="!fake_number!" set "source_file=!fake_file%%N!"
 if not defined source_file (
-    echo Invalid fake file number.
+    call :ui_echo "Invalid fake file number." "Неверный номер файла фейка."
     pause
     cls
     goto replace_active_fakes_prompt
@@ -1260,9 +1291,9 @@ if not defined source_file (
 del /f /q "!active_file!" >nul 2>&1
 copy /y "!source_file!" "!active_file!" >nul
 if errorlevel 1 (
-    echo Failed to replace the active fake file.
+    call :ui_echo "Failed to replace the active fake file." "Не удалось заменить активный файл фейка."
 ) else (
-    echo Active fake file replaced successfully.
+    call :ui_echo "Active fake file replaced successfully." "Активный файл фейка успешно заменён."
     for /l %%N in (1,1,!fake_count!) do if "%%N"=="!fake_number!" (
         if "!fake_type!"=="1" set "current_discord_fake=!fake_name%%N!"
         if "!fake_type!"=="2" set "current_game_fake=!fake_name%%N!"
@@ -1275,8 +1306,7 @@ goto replace_active_fakes_prompt
 
 :: IPSET SWITCH =======================
 :ipset_switch_status
-chcp 437 > nul
-
+call :set_ui_codepage
 set "listFile=%~dp0lists\ipset-all.txt"
 for /f %%i in ('type "%listFile%" 2^>nul ^| find /c /v ""') do set "lineCount=%%i"
 
@@ -1294,14 +1324,14 @@ exit /b
 
 
 :ipset_switch
-chcp 437 > nul
+call :set_ui_codepage
 cls
 
 set "listFile=%~dp0lists\ipset-all.txt"
 set "backupFile=%listFile%.backup"
 
 if "%IPsetStatus%"=="loaded" (
-    echo Switching to none mode...
+    call :ui_echo "Switching to none mode..." "Переключение в режим none..."
     
     if not exist "%backupFile%" (
         ren "%listFile%" "ipset-all.txt.backup"
@@ -1315,20 +1345,20 @@ if "%IPsetStatus%"=="loaded" (
     )
     
 ) else if "%IPsetStatus%"=="none" (
-    echo Switching to any mode...
+    call :ui_echo "Switching to any mode..." "Переключение в режим any..."
     
     >"%listFile%" (
         rem Creating empty file
     )
     
 ) else if "%IPsetStatus%"=="any" (
-    echo Switching to loaded mode...
+    call :ui_echo "Switching to loaded mode..." "Переключение в режим loaded..."
     
     if exist "%backupFile%" (
         del /f /q "%listFile%"
         ren "%backupFile%" "ipset-all.txt"
     ) else (
-        echo Error: no backup to restore. Update list from service menu first
+        call :ui_echo "Error: no backup to restore. Update list from service menu first" "Ошибка: резервная копия отсутствует. Сначала обновите список через меню службы"
         pause
         goto menu
     )
@@ -1341,13 +1371,13 @@ goto menu
 
 :: IPSET UPDATE =======================
 :ipset_update
-chcp 437 > nul
+call :set_ui_codepage
 cls
 
 set "listFile=%~dp0lists\ipset-all.txt"
 set "url=https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/refs/heads/main/.service/ipset-service.txt"
 
-echo Updating ipset-all...
+call :ui_echo "Updating ipset-all..." "Обновление ipset-all..."
 
 if exist "%SystemRoot%\System32\curl.exe" (
     curl --version | find "libcurl/7"
@@ -1366,7 +1396,7 @@ if exist "%SystemRoot%\System32\curl.exe" (
         "if ($res.StatusCode -eq 200) { $res.Content | Out-File -FilePath $out -Encoding UTF8 } else { exit 1 }"
 )
 
-echo Finished
+call :ui_echo "Finished" "Завершено"
 
 pause
 goto menu
@@ -1374,7 +1404,7 @@ goto menu
 
 :: HOSTS UPDATE =======================
 :hosts_update
-chcp 437 > nul
+call :set_ui_codepage
 cls
 
 set "hostsFile=%SystemRoot%\System32\drivers\etc\hosts"
@@ -1385,7 +1415,7 @@ set "needsUpdate=0"
 set "cacheBuster=%RANDOM%%RANDOM%%RANDOM%"
 set "requestUrl=%hostsUrl%?t=%cacheBuster%"
 
-echo Checking hosts file...
+call :ui_echo "Checking hosts file..." "Проверка файла Hosts..."
 
 if exist "%SystemRoot%\System32\curl.exe" (
     curl -L -s -f -o "%tempFile%" "%requestUrl%"
@@ -1397,8 +1427,8 @@ if exist "%SystemRoot%\System32\curl.exe" (
         "if ($res.StatusCode -eq 200) { $res.Content | Out-File -FilePath $out -Encoding UTF8 } else { exit 1 }"
 )
 if not exist "%tempFile%" (
-    call :PrintRed "Failed to download hosts file from repository"
-    call :PrintYellow "Copy hosts file manually from %hostsUrl%"
+    call :ui_print PrintRed "Failed to download hosts file from repository" "Не удалось загрузить файл Hosts из репозитория"
+    call :ui_print PrintYellow "Copy hosts file manually from %hostsUrl%" "Скопируйте файл Hosts вручную отсюда: %hostsUrl%"
     pause
     goto menu
 )
@@ -1414,25 +1444,25 @@ for /f "usebackq delims=" %%a in ("%tempFile%") do (
 
 findstr /C:"!firstLine!" "%hostsFile%" >nul 2>&1
 if !errorlevel! neq 0 (
-    echo First line from repository not found in hosts file
+    call :ui_echo "First line from repository not found in hosts file" "Первая строка из репозитория не найдена в файле Hosts"
     set "needsUpdate=1"
 )
 
 findstr /C:"!lastLine!" "%hostsFile%" >nul 2>&1
 if !errorlevel! neq 0 (
-    echo Last line from repository not found in hosts file
+    call :ui_echo "Last line from repository not found in hosts file" "Последняя строка из репозитория не найдена в файле Hosts"
     set "needsUpdate=1"
 )
 
 if "%needsUpdate%"=="1" (
     echo:
-    call :PrintYellow "Hosts file needs to be updated"
-    call :PrintYellow "Please manually copy the content from the downloaded file to your hosts file"
+    call :ui_print PrintYellow "Hosts file needs to be updated" "Файл Hosts необходимо обновить"
+    call :ui_print PrintYellow "Please manually copy the content from the downloaded file to your hosts file" "Скопируйте содержимое загруженного файла в системный файл Hosts вручную"
     
     start notepad "%tempFile%"
     explorer /select,"%hostsFile%"
 ) else (
-    call :PrintGreen "Hosts file is up to date"
+    call :ui_print PrintGreen "Hosts file is up to date" "Файл Hosts актуален"
     if exist "%tempFile%" del /f /q "%tempFile%"
 )
 
@@ -1443,20 +1473,20 @@ goto menu
 
 :: RUN TESTS =============================
 :run_tests
-chcp 437 >nul
+call :set_ui_codepage
 cls
 
 :: Require PowerShell 3.0+
 powershell -NoProfile -Command "if ($PSVersionTable -and $PSVersionTable.PSVersion -and $PSVersionTable.PSVersion.Major -ge 3) { exit 0 } else { exit 1 }" >nul 2>&1
 if %errorLevel% neq 0 (
-    echo PowerShell 3.0 or newer is required.
-    echo Please upgrade PowerShell and rerun this script.
+    call :ui_echo "PowerShell 3.0 or newer is required." "Требуется PowerShell 3.0 или новее."
+    call :ui_echo "Please upgrade PowerShell and rerun this script." "Обновите PowerShell и запустите этот скрипт повторно."
     echo.
     pause
     goto menu
 )
 
-echo Starting configuration tests in PowerShell window...
+call :ui_echo "Starting configuration tests in PowerShell window..." "Запуск тестирования конфигураций в окне PowerShell..."
 echo.
 start "" powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\test zapret.ps1"
 pause
@@ -1466,7 +1496,9 @@ goto menu
 :: Get strategy name
 :get_strategy_name
 set "CurrentStrategy="
-for /f "tokens=2*" %%A in ('reg query "HKLM\System\CurrentControlSet\Services\zapret" /v zapret-discord-youtube 2^>nul') do set "CurrentStrategy=Strategy: %%B"
+for /f "tokens=2*" %%A in ('reg query "HKLM\System\CurrentControlSet\Services\zapret" /v zapret-discord-youtube 2^>nul') do (
+    if /i "!UI_LANG!"=="ru" (set "CurrentStrategy=Стратегия: %%B") else set "CurrentStrategy=Strategy: %%B"
+)
 exit /b
 
 
@@ -1480,12 +1512,12 @@ set "discordCacheDir=%~3"
 
 tasklist /FI "IMAGENAME eq !discordProcess!" 2>nul | findstr /I /C:"!discordProcess!" >nul
 if !errorlevel! equ 0 (
-    echo !discordName! is running, closing...
+    call :ui_echo " !discordName! is running, closing..." " !discordName! запущен, закрытие..."
     taskkill /IM "!discordProcess!" /F >nul 2>&1
     if !errorlevel! equ 0 (
-        call :PrintGreen "!discordName! was successfully closed"
+        call :ui_print PrintGreen "!discordName! was successfully closed" "!discordName! успешно закрыт"
     ) else (
-        call :PrintRed "Unable to close !discordName!"
+        call :ui_print PrintRed "Unable to close !discordName!" "Не удалось закрыть !discordName!"
     )
 )
 
@@ -1495,12 +1527,12 @@ if exist "!discordCacheDir!\" (
         if exist "!dirPath!\" (
             rd /s /q "!dirPath!" >nul 2>&1
             if exist "!dirPath!\" (
-                call :PrintRed "Failed to delete !dirPath!"
+                call :ui_print PrintRed "Failed to delete !dirPath!" "Не удалось удалить !dirPath!"
             ) else (
-                call :PrintGreen "Successfully deleted !dirPath!"
+                call :ui_print PrintGreen "Successfully deleted !dirPath!" "Успешно удалено: !dirPath!"
             )
         ) else (
-            call :PrintRed "!dirPath! does not exist"
+            call :ui_print PrintRed "!dirPath! does not exist" "Путь !dirPath! не существует"
         )
     )
 )
@@ -1523,8 +1555,8 @@ exit /b
 :check_command
 where %1 >nul 2>&1
 if %errorLevel% neq 0 (
-    echo [ERROR] %1 not found in PATH
-    echo Fix your PATH variable with instructions here https://github.com/Flowseal/zapret-discord-youtube/issues/7490
+    call :ui_echo "[ERROR] %1 not found in PATH" "[ОШИБКА] %1 не найден в PATH"
+    call :ui_echo "Fix your PATH variable with instructions here https://github.com/Flowseal/zapret-discord-youtube/issues/7490" "Исправьте переменную PATH по инструкции: https://github.com/Flowseal/zapret-discord-youtube/issues/7490"
     pause
     exit /b 1
 )
@@ -1536,7 +1568,7 @@ set "extracted=1"
 if not exist "%~dp0bin\" set "extracted=0"
 
 if "%extracted%"=="0" (
-    echo Zapret must be extracted from archive first or bin folder not found for some reason
+    call :ui_echo "Zapret must be extracted from archive first or bin folder not found for some reason" "Сначала распакуйте Zapret из архива или проверьте наличие папки bin"
     pause
     exit
 )
@@ -1563,3 +1595,28 @@ for %%F in ("%~dp0general*.bat") do (
 if not defined selectedFile exit /b 2
 set "AUTO_INSTALL_NONINTERACTIVE=1"
 goto service_install_prepare
+
+
+:set_ui_codepage
+if /i "%UI_LANG%"=="ru" (chcp 65001 >nul) else (chcp 437 >nul)
+exit /b
+
+:ui_echo
+set "UI_MSG_EN=%~1"
+set "UI_MSG_RU=%~2"
+if /i "%UI_LANG%"=="ru" (echo(%UI_MSG_RU%) else echo(%UI_MSG_EN%)
+exit /b
+
+:ui_print
+set "UI_COLOR=%~1"
+set "UI_MSG_EN=%~2"
+set "UI_MSG_RU=%~3"
+if /i "%UI_LANG%"=="ru" (call :%UI_COLOR% "%UI_MSG_RU%") else call :%UI_COLOR% "%UI_MSG_EN%"
+exit /b
+
+:ui_prompt
+set "UI_PROMPT_EN=%~2"
+set "UI_PROMPT_RU=%~3"
+if /i "%UI_LANG%"=="ru" (set "UI_PROMPT=%UI_PROMPT_RU%") else set "UI_PROMPT=%UI_PROMPT_EN%"
+set /p "%~1=%UI_PROMPT%"
+exit /b
