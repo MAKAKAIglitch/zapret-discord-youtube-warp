@@ -8,3 +8,7 @@
 /build/
 /utils/fix_filters.ini
 /lists/minecraft-domains-resolved.txt
+/lists/hostlist-auto.txt
+/utils/auto-strategy.log
+/utils/auto-strategy.last-run.txt
+/utils/auto-strategy.lock

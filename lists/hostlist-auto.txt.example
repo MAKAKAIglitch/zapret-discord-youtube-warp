@@ -1,0 +1,3 @@
+# Runtime autohostlist file is created as lists/hostlist-auto.txt.
+# zapret appends domains here after detecting a likely TCP/443 block.
+# You can review or remove entries manually; one hostname per line.

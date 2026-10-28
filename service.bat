@@ -28,6 +28,7 @@ if "%~1"=="load_game_filter" (
 )
 
 if "%~1"=="load_fix_settings" goto external_load_fix_settings
+if /i "%~1"=="install_strategy_auto" goto external_install_strategy_auto
 
 if "%~1"=="load_user_lists" (
     call :load_user_lists
@@ -92,7 +93,7 @@ echo.
 echo   :: TOOLS
 echo      11. Run Diagnostics
 echo      12. Run Tests
-echo      13. Custom Fixes (WARP/Minecraft) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!]
+echo      13. Custom Fixes (WARP/Minecraft/Auto) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!, Auto pick: !AutoStrategyStatus!, AutoHostlist: !AutoHostlistStatus!]
 echo.
 echo   ----------------------------------------
 echo      0. Exit
@@ -302,12 +303,14 @@ set "ZAPRET_MINECRAFT_FILTER_WF=!MinecraftFilterWF!"
 set "ZAPRET_WARP_FILTER_WF=!WarpFilterWF!"
 set "ZAPRET_MINECRAFT_FILTER_SKIP=!MinecraftFilterSkip!"
 set "ZAPRET_WARP_FILTER_SKIP=!WarpFilterSkip!"
+set "ZAPRET_AUTOHOSTLIST_SKIP=!AutoHostlistSkip!"
 powershell -NoProfile -Command ^
     "$strategyText = [System.IO.File]::ReadAllText($env:ZAPRET_STRATEGY_SOURCE);" ^
     "$strategyText = $strategyText.Replace(([string][char]37 + 'MinecraftFilterWF' + [string][char]37), [string]$env:ZAPRET_MINECRAFT_FILTER_WF);" ^
     "$strategyText = $strategyText.Replace(([string][char]37 + 'WarpFilterWF' + [string][char]37), [string]$env:ZAPRET_WARP_FILTER_WF);" ^
     "$strategyText = $strategyText.Replace(([string][char]37 + 'MinecraftFilterSkip' + [string][char]37), [string]$env:ZAPRET_MINECRAFT_FILTER_SKIP);" ^
     "$strategyText = $strategyText.Replace(([string][char]37 + 'WarpFilterSkip' + [string][char]37), [string]$env:ZAPRET_WARP_FILTER_SKIP);" ^
+    "$strategyText = $strategyText.Replace(([string][char]37 + 'AutoHostlistSkip' + [string][char]37), [string]$env:ZAPRET_AUTOHOSTLIST_SKIP);" ^
     "[System.IO.File]::WriteAllText($env:ZAPRET_STRATEGY_TEMP, $strategyText, [System.Text.UTF8Encoding]::new($false))"
 if not exist "!ZAPRET_STRATEGY_TEMP!" (
     call :PrintRed "Failed to prepare strategy using the current fix settings."
@@ -408,6 +411,15 @@ sc start %SRVCNAME%
 for %%F in ("!selectedFile!") do set "filename=%%~nF"
 reg add "HKLM\System\CurrentControlSet\Services\zapret" /v zapret-discord-youtube /t REG_SZ /d "!filename!" /f
 if exist "!ZAPRET_STRATEGY_TEMP!" del /f /q "!ZAPRET_STRATEGY_TEMP!" >nul 2>&1
+
+if defined AUTO_INSTALL_NONINTERACTIVE (
+    for /l %%N in (1,1,15) do (
+        sc query "zapret" | findstr /I "RUNNING" >nul
+        if not errorlevel 1 exit /b 0
+        timeout /t 1 /nobreak >nul
+    )
+    exit /b 1
+)
 
 pause
 goto menu
@@ -951,21 +963,29 @@ exit /b
 set "fixFiltersFile=%~dp0utils\fix_filters.ini"
 set "WarpFilterEnabled=1"
 set "MinecraftFilterEnabled=1"
+set "AutoStrategyEnabled=0"
+set "AutoHostlistEnabled=0"
 
 if not exist "%fixFiltersFile%" (
     >"%fixFiltersFile%" (
         echo warp=1
         echo minecraft=1
+        echo autostrategy=0
+        echo autohostlist=0
     )
 )
 
 for /f "usebackq tokens=1,* delims==" %%A in ("%fixFiltersFile%") do (
     if /i "%%A"=="warp" set "WarpFilterEnabled=%%B"
     if /i "%%A"=="minecraft" set "MinecraftFilterEnabled=%%B"
+    if /i "%%A"=="autostrategy" set "AutoStrategyEnabled=%%B"
+    if /i "%%A"=="autohostlist" set "AutoHostlistEnabled=%%B"
 )
 
 if not "%WarpFilterEnabled%"=="0" if not "%WarpFilterEnabled%"=="1" set "WarpFilterEnabled=1"
 if not "%MinecraftFilterEnabled%"=="0" if not "%MinecraftFilterEnabled%"=="1" set "MinecraftFilterEnabled=1"
+if not "%AutoStrategyEnabled%"=="0" if not "%AutoStrategyEnabled%"=="1" set "AutoStrategyEnabled=0"
+if not "%AutoHostlistEnabled%"=="0" if not "%AutoHostlistEnabled%"=="1" set "AutoHostlistEnabled=0"
 
 set "WarpFilterWF="
 set "WarpFilterSkip=--skip"
@@ -976,6 +996,16 @@ set "MinecraftFilterWF="
 set "MinecraftFilterSkip=--skip"
 if "%MinecraftFilterEnabled%"=="1" set "MinecraftFilterWF=,25565"
 if "%MinecraftFilterEnabled%"=="1" set "MinecraftFilterSkip="
+
+set "AutoHostlistSkip=--skip"
+if "%AutoHostlistEnabled%"=="1" set "AutoHostlistSkip="
+if not exist "%~dp0lists\hostlist-auto.txt" (
+    if exist "%~dp0lists\hostlist-auto.txt.example" (
+        copy /y "%~dp0lists\hostlist-auto.txt.example" "%~dp0lists\hostlist-auto.txt" >nul
+    ) else (
+        type nul > "%~dp0lists\hostlist-auto.txt"
+    )
+)
 exit /b
 
 
@@ -983,6 +1013,8 @@ exit /b
 call :load_fix_settings
 if "%WarpFilterEnabled%"=="1" (set "WarpFilterStatus=enabled") else set "WarpFilterStatus=disabled"
 if "%MinecraftFilterEnabled%"=="1" (set "MinecraftFilterStatus=enabled") else set "MinecraftFilterStatus=disabled"
+if "%AutoStrategyEnabled%"=="1" (set "AutoStrategyStatus=enabled") else set "AutoStrategyStatus=disabled"
+if "%AutoHostlistEnabled%"=="1" (set "AutoHostlistStatus=enabled") else set "AutoHostlistStatus=disabled"
 exit /b
 
 
@@ -990,6 +1022,8 @@ exit /b
 >"%fixFiltersFile%" (
     echo warp=%WarpFilterEnabled%
     echo minecraft=%MinecraftFilterEnabled%
+    echo autostrategy=%AutoStrategyEnabled%
+    echo autohostlist=%AutoHostlistEnabled%
 )
 exit /b
 
@@ -1006,11 +1040,15 @@ echo      Ports: UDP 500, 1701, 4500, 8095, 2408
 echo   2. Toggle Minecraft servers [!MinecraftFilterStatus!]
 echo      TCP/25565, IP list and domains from minecraft-domains.txt
 echo   3. Refresh Minecraft domain IP addresses
+echo   4. Auto-pick strategy while idle [!AutoStrategyStatus!]
+echo      Tests strategies only after 15 minutes of user inactivity
+echo   5. AutoHostlist [!AutoHostlistStatus!]
+echo      Dynamically learns blocked TCP/443 domains into hostlist-auto.txt
 echo.
 echo   0. Back
 echo.
 set "FixFiltersChoice=0"
-set /p "FixFiltersChoice=Select option (0-3, default: 0): "
+set /p "FixFiltersChoice=Select option (0-5, default: 0): "
 if "!FixFiltersChoice!"=="1" (
     if "!WarpFilterEnabled!"=="1" (set "WarpFilterEnabled=0") else set "WarpFilterEnabled=1"
     call :save_fix_filters
@@ -1029,8 +1067,42 @@ if "!FixFiltersChoice!"=="3" (
     pause
     goto fix_filters_menu
 )
+if "!FixFiltersChoice!"=="4" (
+    if "!AutoStrategyEnabled!"=="1" (set "AutoStrategyEnabled=0") else set "AutoStrategyEnabled=1"
+    call :save_fix_filters
+    call :manage_auto_strategy_task
+    goto fix_filters_menu
+)
+if "!FixFiltersChoice!"=="5" (
+    if "!AutoHostlistEnabled!"=="1" (set "AutoHostlistEnabled=0") else set "AutoHostlistEnabled=1"
+    call :save_fix_filters
+    call :apply_fix_filter_changes
+    goto fix_filters_menu
+)
 if "!FixFiltersChoice!"=="0" goto menu
 goto fix_filters_menu
+
+
+:manage_auto_strategy_task
+if "%AutoStrategyEnabled%"=="1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\manage-auto-strategy-task.ps1" -Action Enable
+    if errorlevel 1 (
+        set "AutoStrategyEnabled=0"
+        call :save_fix_filters
+        call :PrintRed "Could not register the idle auto-strategy task; it has been disabled."
+    ) else (
+        call :PrintGreen "Idle auto-strategy task enabled. It checks every 30 minutes."
+    )
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\manage-auto-strategy-task.ps1" -Action Disable
+    if errorlevel 1 (
+        call :PrintYellow "Could not remove the idle auto-strategy task."
+    ) else (
+        call :PrintGreen "Idle auto-strategy task disabled."
+    )
+)
+pause
+exit /b
 
 
 :apply_fix_filter_changes
@@ -1475,3 +1547,19 @@ exit /b 0
 call :load_fix_settings
 if "%MinecraftFilterEnabled%"=="1" call :refresh_minecraft_domains
 exit /b
+
+
+:external_install_strategy_auto
+if /i not "%~3"=="admin" exit /b 2
+setlocal EnableDelayedExpansion
+cd /d "%~dp0"
+set "BIN_PATH=%~dp0bin\"
+set "LISTS_PATH=%~dp0lists\"
+call :load_user_lists
+set "selectedFile="
+for %%F in ("%~dp0general*.bat") do (
+    if /i "%%~nxF"=="%~2" set "selectedFile=%%~fF"
+)
+if not defined selectedFile exit /b 2
+set "AUTO_INSTALL_NONINTERACTIVE=1"
+goto service_install_prepare
