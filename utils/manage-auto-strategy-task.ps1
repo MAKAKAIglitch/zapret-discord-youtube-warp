@@ -27,6 +27,11 @@ try {
         throw 'Run service.bat as administrator to register the scheduled task.'
     }
 
+    $service = Get-Service -Name 'zapret' -ErrorAction SilentlyContinue
+    if (-not $service -or $service.Status -ne 'Running') {
+        throw 'Start the zapret service before enabling automatic strategy selection.'
+    }
+
     $userId = $identity.Name
     if ([string]::IsNullOrWhiteSpace($userId) -or $userId -match '^(NT AUTHORITY|NT SERVICE)\\') {
         throw 'Auto strategy requires a regular interactive Windows account.'

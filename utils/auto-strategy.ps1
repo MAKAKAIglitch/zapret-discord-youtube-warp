@@ -255,9 +255,15 @@ function Invoke-UrlChecks {
     }
 }
 
-# Skip entirely unless the option is explicitly enabled.
+# Skip entirely unless the option is explicitly enabled and zapret is running.
 $settings = Read-FixSettings
 if ($settings['autostrategy'] -ne '1') { return }
+
+$initialService = Get-Service -Name 'zapret' -ErrorAction SilentlyContinue
+if (-not $initialService -or $initialService.Status -ne 'Running') {
+    try { Write-Log 'Skipped: zapret service is not running; auto-pick requires a running service.' } catch {}
+    return
+}
 
 if (Test-Path -LiteralPath $lastRunFile) {
     try {

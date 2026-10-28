@@ -1117,6 +1117,15 @@ goto fix_filters_menu
 
 :manage_auto_strategy_task
 if "%AutoStrategyEnabled%"=="1" (
+    powershell -NoProfile -Command "$s = Get-Service -Name 'zapret' -ErrorAction SilentlyContinue; if ($s -and $s.Status -eq 'Running') { exit 0 } else { exit 1 }" >nul 2>&1
+    if errorlevel 1 (
+        set "AutoStrategyEnabled=0"
+        call :save_fix_filters
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\manage-auto-strategy-task.ps1" -Action Disable >nul 2>&1
+        call :ui_print PrintYellow "Auto-pick requires the zapret service to be running. Enable it after starting zapret." "Для автоподбора сначала запустите службу zapret, а затем включите эту функцию."
+        pause
+        exit /b
+    )
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\manage-auto-strategy-task.ps1" -Action Enable
     if errorlevel 1 (
         set "AutoStrategyEnabled=0"
@@ -1135,8 +1144,6 @@ if "%AutoStrategyEnabled%"=="1" (
 )
 pause
 exit /b
-
-
 :apply_fix_filter_changes
 call :load_fix_settings
 echo.
