@@ -23,24 +23,54 @@ SOFTWARE.
 
 ---
 
-This repository contains binary files originating from the project by bol-van,  
-available at: https://github.com/bol-van/zapret/ (licensed under the MIT License).
+## Third-party components
 
-This repository also includes and depends on WinDivert  
-(https://github.com/basil00/WinDivert), which is licensed under your choice of:
+The MIT notice above is retained from the upstream project. It does not
+replace or override the separate license terms that apply to bundled
+third-party components.
 
-1. The GNU Lesser General Public License (LGPL) Version 3, or  
-2. The GNU General Public License (GPL) Version 2.
+### zapret
 
-Binary distributions of WinDivert are included in this project as-is, without modification.  
-The corresponding source code and license terms for WinDivert are available at  
-https://github.com/basil00/WinDivert.
+This repository contains files originating from
+[bol-van/zapret](https://github.com/bol-van/zapret), which is licensed under
+the MIT License. The original copyright and license notices are retained
+above and in the upstream project.
+
+### WinDivert
+
+The distribution includes the WinDivert library and driver:
+
+- `bin/WinDivert.dll`
+- `bin/WinDivert64.sys`
+
+WinDivert is dual-licensed under the GNU Lesser General Public License
+(LGPL) version 3 or the GNU General Public License (GPL) version 2, at the
+recipient's choice. The complete license notice supplied by the upstream
+project is reproduced in
+[`THIRD_PARTY_LICENSES/WinDivert-LICENSE.txt`](./THIRD_PARTY_LICENSES/WinDivert-LICENSE.txt).
+
+Upstream project and source code:
+https://github.com/basil00/WinDivert
+
+### Cygwin runtime
+
+The distribution includes the Cygwin runtime library:
+
+- `bin/cygwin1.dll`
+
+The Cygwin DLL is licensed under the GNU Lesser General Public License
+(LGPL) version 3 or any later version, with the Cygwin linking exception
+described in the upstream notice. The corresponding notice and license text
+are provided in:
+
+- [`THIRD_PARTY_LICENSES/Cygwin-CYGWIN_LICENSE.txt`](./THIRD_PARTY_LICENSES/Cygwin-CYGWIN_LICENSE.txt)
+- [`THIRD_PARTY_LICENSES/Cygwin-LGPLv3.txt`](./THIRD_PARTY_LICENSES/Cygwin-LGPLv3.txt)
+
+Cygwin source project:
+https://github.com/mirror/newlib-cygwin
 
 ---
 
-To comply with the licenses of these projects:
-
-1. The original copyright notices and licenses (above) are retained.  
-2. The use of WinDivert in this project is governed by its licensing terms (LGPLv3/GPLv2).  
-3. This repository provides only binary files and does not include the source code of  
-   the project by bol-van or modifications to WinDivert.  
+Keep the applicable third-party copyright notices and license texts when
+redistributing this repository or its binary releases. Each component remains
+under its own license; this file does not relicense third-party software.
