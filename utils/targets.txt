@@ -26,6 +26,10 @@ GoogleGstatic         = "https://www.gstatic.com"
 ### Cloudflare
 CloudflareWeb         = "https://www.cloudflare.com"
 CloudflareCDN         = "https://cdnjs.cloudflare.com"
+Warp = "cloudflarecp.com"
+Warp = "warp.plus"
+Warp = "cloudflareaccess.com"
+Warp = "cloudflare.net"
 
 ### Public DNS (PING-only)
 CloudflareDNS1111     = "PING:1.1.1.1"
