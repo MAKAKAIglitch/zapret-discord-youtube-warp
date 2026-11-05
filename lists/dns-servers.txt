@@ -1,0 +1,119 @@
+# Secure DNS resolver hostnames for zapret hostlist matching.
+# Hostnames only: no scheme (https://, tls://, quic://) and no URL path.
+# DoH: TCP/443 | DoH3: UDP/443 | DoT: TCP/853,8853 | DoQ: UDP/853
+
+# NextDNS (profile IDs are subdomains of dns.nextdns.io)
+dns.nextdns.io
+anycast.dns.nextdns.io
+
+# Cloudflare 1.1.1.1
+cloudflare-dns.com
+one.one.one.one
+security.cloudflare-dns.com
+family.cloudflare-dns.com
+
+# Google Public DNS
+dns.google
+
+# Quad9
+dns.quad9.net
+dns10.quad9.net
+dns11.quad9.net
+dns12.quad9.net
+
+# AdGuard DNS
+dns.adguard-dns.com
+family.adguard-dns.com
+unfiltered.adguard-dns.com
+
+# Control D
+freedns.controld.com
+dns.controld.com
+p0.freedns.controld.com
+p1.freedns.controld.com
+
+# Cisco OpenDNS
+doh.opendns.com
+dns.opendns.com
+doh.familyshield.opendns.com
+familyshield.opendns.com
+doh.sandbox.opendns.com
+sandbox.opendns.com
+
+# CleanBrowsing
+doh.cleanbrowsing.org
+family-filter-dns.cleanbrowsing.org
+adult-filter-dns.cleanbrowsing.org
+security-filter-dns.cleanbrowsing.org
+
+# DNS4EU
+protective.joindns4.eu
+child.joindns4.eu
+noads.joindns4.eu
+child-noads.joindns4.eu
+unfiltered.joindns4.eu
+
+# Surfshark DNS
+dns.surfsharkdns.com
+
+# DNS.SB
+doh.dns.sb
+dot.sb
+
+# Njalla
+dns.njal.la
+
+# LibreDNS
+doh.libredns.gr
+dot.libredns.gr
+
+# RethinkDNS
+sky.rethinkdns.com
+basic.rethinkdns.com
+max.rethinkdns.com
+
+# Applied Privacy DNS
+doh.applied-privacy.net
+dot1.applied-privacy.net
+
+# DNS for Family
+dns-doh.dnsforfamily.com
+dns-dot.dnsforfamily.com
+
+# DNSPod Public DNS+
+dns.pub
+sm2.doh.pub
+
+# OneDNS
+doh.onedns.net
+dot.onedns.net
+doh-pure.onedns.net
+dot-pure.onedns.net
+
+# SWITCH DNS
+dns.switch.ch
+
+# UK DNS Privacy Project
+resolver.dnsprivacy.org.uk
+
+# CZ.NIC ODVR
+odvr.nic.cz
+
+# Digitale Gesellschaft DNS
+dns.digitale-gesellschaft.ch
+
+# CERT-EE
+dns.cert.ee
+
+# Wikimedia DNS
+wikimedia-dns.org
+
+# v.recipes DNS
+v.recipes
+
+# OpenBLD.net
+ada.openbld.net
+ric.openbld.net
+
+# Comss.one DNS
+router.comss.one

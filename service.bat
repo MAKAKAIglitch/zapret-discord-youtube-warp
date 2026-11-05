@@ -98,7 +98,7 @@ echo.
 call :ui_echo "   :: TOOLS" "   :: ИНСТРУМЕНТЫ"
 call :ui_echo "      11. Run Diagnostics" "      11. Диагностика"
 call :ui_echo "      12. Run Tests" "      12. Тесты"
-call :ui_echo "      13. Custom Fixes (WARP/Minecraft/Auto) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!, Auto pick: !AutoStrategyStatus!, AutoHostlist: !AutoHostlistStatus!]" "      13. Доп. фиксы (WARP/Minecraft/авто) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!, Автовыбор: !AutoStrategyStatus!, AutoHostlist: !AutoHostlistStatus!]"
+call :ui_echo "      13. Custom Fixes (WARP/Minecraft/Auto) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!, Auto pick: !AutoStrategyStatus!, AutoHostlist: !AutoHostlistStatus!, DNS: !DNSFilterStatus!]" "      13. Доп. фиксы (WARP/Minecraft/авто) [WARP: !WarpFilterStatus!, Minecraft: !MinecraftFilterStatus!, Автовыбор: !AutoStrategyStatus!, AutoHostlist: !AutoHostlistStatus!, DNS: !DNSFilterStatus!]"
 echo.
 call :ui_echo "   ----------------------------------------" "   ----------------------------------------"
 call :ui_echo "      0. Exit" "      0. Выход"
@@ -968,6 +968,7 @@ set "WarpFilterEnabled=1"
 set "MinecraftFilterEnabled=1"
 set "AutoStrategyEnabled=0"
 set "AutoHostlistEnabled=0"
+set "DNSFilterEnabled=1"
 
 if not exist "%fixFiltersFile%" (
     >"%fixFiltersFile%" (
@@ -975,6 +976,7 @@ if not exist "%fixFiltersFile%" (
         echo minecraft=1
         echo autostrategy=0
         echo autohostlist=0
+        echo dns=1
     )
 )
 
@@ -983,12 +985,14 @@ for /f "usebackq tokens=1,* delims==" %%A in ("%fixFiltersFile%") do (
     if /i "%%A"=="minecraft" set "MinecraftFilterEnabled=%%B"
     if /i "%%A"=="autostrategy" set "AutoStrategyEnabled=%%B"
     if /i "%%A"=="autohostlist" set "AutoHostlistEnabled=%%B"
+    if /i "%%A"=="dns" set "DNSFilterEnabled=%%B"
 )
 
 if not "%WarpFilterEnabled%"=="0" if not "%WarpFilterEnabled%"=="1" set "WarpFilterEnabled=1"
 if not "%MinecraftFilterEnabled%"=="0" if not "%MinecraftFilterEnabled%"=="1" set "MinecraftFilterEnabled=1"
 if not "%AutoStrategyEnabled%"=="0" if not "%AutoStrategyEnabled%"=="1" set "AutoStrategyEnabled=0"
 if not "%AutoHostlistEnabled%"=="0" if not "%AutoHostlistEnabled%"=="1" set "AutoHostlistEnabled=0"
+if not "%DNSFilterEnabled%"=="0" if not "%DNSFilterEnabled%"=="1" set "DNSFilterEnabled=1"
 
 set "WarpFilterWF="
 set "WarpFilterSkip=--skip"
@@ -1002,6 +1006,16 @@ if "%MinecraftFilterEnabled%"=="1" set "MinecraftFilterSkip="
 
 set "AutoHostlistSkip=--skip"
 if "%AutoHostlistEnabled%"=="1" set "AutoHostlistSkip="
+
+:: Secure DNS endpoints: DoH (TCP/443), DoH3 (UDP/443), DoT (TCP/853,8853), DoQ (UDP/853).
+set "DNSFilterTCPWF="
+set "DNSFilterUDPWF="
+set "DNSFilterArgs="
+if "%DNSFilterEnabled%"=="1" (
+    set "DNSFilterTCPWF=,853,8853"
+    set "DNSFilterUDPWF=,853"
+    set DNSFilterArgs=--filter-tcp=443 --hostlist="%~dp0lists\dns-servers.txt" --hostlist-exclude="%~dp0lists\list-exclude.txt" --hostlist-exclude="%~dp0lists\list-exclude-user.txt" --dpi-desync=fake --dpi-desync-repeats=6 --dpi-desync-fake-tls="%~dp0bin\tls_clienthello_www_google_com.bin" --new --filter-tcp=853,8853 --hostlist="%~dp0lists\dns-servers.txt" --hostlist-exclude="%~dp0lists\list-exclude.txt" --hostlist-exclude="%~dp0lists\list-exclude-user.txt" --dpi-desync=fake --dpi-desync-repeats=6 --dpi-desync-fake-tls="%~dp0bin\tls_clienthello_www_google_com.bin" --new --filter-udp=443 --hostlist="%~dp0lists\dns-servers.txt" --hostlist-exclude="%~dp0lists\list-exclude.txt" --hostlist-exclude="%~dp0lists\list-exclude-user.txt" --dpi-desync=fake --dpi-desync-repeats=6 --dpi-desync-fake-quic="%~dp0bin\quic_initial_www_google_com.bin" --new --filter-udp=853 --hostlist="%~dp0lists\dns-servers.txt" --hostlist-exclude="%~dp0lists\list-exclude.txt" --hostlist-exclude="%~dp0lists\list-exclude-user.txt" --dpi-desync=fake --dpi-desync-repeats=6 --dpi-desync-fake-quic="%~dp0bin\quic_initial_www_google_com.bin" --new
+)
 if not exist "%~dp0lists\hostlist-auto.txt" (
     if exist "%~dp0lists\hostlist-auto.txt.example" (
         copy /y "%~dp0lists\hostlist-auto.txt.example" "%~dp0lists\hostlist-auto.txt" >nul
@@ -1020,6 +1034,7 @@ set "WarpFilterStatusDisplay=!WarpFilterStatus!"
 set "MinecraftFilterStatusDisplay=!MinecraftFilterStatus!"
 set "AutoStrategyStatusDisplay=!AutoStrategyStatus!"
 set "AutoHostlistStatusDisplay=!AutoHostlistStatus!"
+set "DNSFilterStatusDisplay=!DNSFilterStatus!"
 if /i "%UI_LANG%"=="ru" (
     if /i "!GameFilterStatus!"=="enabled" set "GameFilterStatusDisplay=включён"
     if /i "!GameFilterStatus!"=="disabled" set "GameFilterStatusDisplay=выключен"
@@ -1036,6 +1051,8 @@ if /i "%UI_LANG%"=="ru" (
     if /i "!AutoStrategyStatus!"=="disabled" set "AutoStrategyStatusDisplay=выключен"
     if /i "!AutoHostlistStatus!"=="enabled" set "AutoHostlistStatusDisplay=включён"
     if /i "!AutoHostlistStatus!"=="disabled" set "AutoHostlistStatusDisplay=выключен"
+    if /i "!DNSFilterStatus!"=="enabled" set "DNSFilterStatusDisplay=включён"
+    if /i "!DNSFilterStatus!"=="disabled" set "DNSFilterStatusDisplay=выключен"
 )
 exit /b
 
@@ -1046,6 +1063,7 @@ if "%WarpFilterEnabled%"=="1" (set "WarpFilterStatus=enabled") else set "WarpFil
 if "%MinecraftFilterEnabled%"=="1" (set "MinecraftFilterStatus=enabled") else set "MinecraftFilterStatus=disabled"
 if "%AutoStrategyEnabled%"=="1" (set "AutoStrategyStatus=enabled") else set "AutoStrategyStatus=disabled"
 if "%AutoHostlistEnabled%"=="1" (set "AutoHostlistStatus=enabled") else set "AutoHostlistStatus=disabled"
+if "%DNSFilterEnabled%"=="1" (set "DNSFilterStatus=enabled") else set "DNSFilterStatus=disabled"
 exit /b
 
 
@@ -1055,6 +1073,7 @@ exit /b
     echo minecraft=%MinecraftFilterEnabled%
     echo autostrategy=%AutoStrategyEnabled%
     echo autohostlist=%AutoHostlistEnabled%
+    echo dns=%DNSFilterEnabled%
 )
 exit /b
 
@@ -1076,11 +1095,14 @@ call :ui_echo "   4. Auto-pick strategy while idle [!AutoStrategyStatus!]" "   4
 call :ui_echo "      Tests strategies only after 15 minutes of user inactivity" "      Проверка после 15 минут бездействия пользователя"
 call :ui_echo "   5. AutoHostlist [!AutoHostlistStatus!]" "   5. AutoHostlist [!AutoHostlistStatusDisplay!]"
 call :ui_echo "      Dynamically learns blocked TCP/443 domains into hostlist-auto.txt" "      Автоматически добавляет заблокированные домены TCP/443 в hostlist-auto.txt"
+call :ui_echo "   6. Toggle secure DNS filter [!DNSFilterStatus!]" "   6. Фильтр защищённого DNS [!DNSFilterStatusDisplay!]"
+call :ui_echo "      DoH TCP/443, DoH3 UDP/443, DoT TCP/853+8853, DoQ UDP/853" "      DoH TCP/443, DoH3 UDP/443, DoT TCP/853+8853, DoQ UDP/853"
+call :ui_echo "      Edit lists/dns-servers.txt" "      Список: lists/dns-servers.txt"
 echo.
 call :ui_echo "   0. Back" "   0. Назад"
 echo.
 set "FixFiltersChoice=0"
-call :ui_prompt FixFiltersChoice "Select option (0-5, default: 0): " "Выберите пункт (0–5, по умолчанию 0): "
+call :ui_prompt FixFiltersChoice "Select option (0-6, default: 0): " "Выберите пункт (0–6, по умолчанию 0): "
 if "!FixFiltersChoice!"=="1" (
     if "!WarpFilterEnabled!"=="1" (set "WarpFilterEnabled=0") else set "WarpFilterEnabled=1"
     call :save_fix_filters
@@ -1107,6 +1129,12 @@ if "!FixFiltersChoice!"=="4" (
 )
 if "!FixFiltersChoice!"=="5" (
     if "!AutoHostlistEnabled!"=="1" (set "AutoHostlistEnabled=0") else set "AutoHostlistEnabled=1"
+    call :save_fix_filters
+    call :apply_fix_filter_changes
+    goto fix_filters_menu
+)
+if "!FixFiltersChoice!"=="6" (
+    if "!DNSFilterEnabled!"=="1" (set "DNSFilterEnabled=0") else set "DNSFilterEnabled=1"
     call :save_fix_filters
     call :apply_fix_filter_changes
     goto fix_filters_menu
