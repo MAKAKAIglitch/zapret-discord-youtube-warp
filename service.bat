@@ -307,6 +307,9 @@ set "ZAPRET_WARP_FILTER_WF=!WarpFilterWF!"
 set "ZAPRET_MINECRAFT_FILTER_SKIP=!MinecraftFilterSkip!"
 set "ZAPRET_WARP_FILTER_SKIP=!WarpFilterSkip!"
 set "ZAPRET_AUTOHOSTLIST_SKIP=!AutoHostlistSkip!"
+set "ZAPRET_DNS_FILTER_TCP_WF=!DNSFilterTCPWF!"
+set "ZAPRET_DNS_FILTER_UDP_WF=!DNSFilterUDPWF!"
+set "ZAPRET_DNS_FILTER_ARGS=!DNSFilterArgs!"
 powershell -NoProfile -Command ^
     "$strategyText = [System.IO.File]::ReadAllText($env:ZAPRET_STRATEGY_SOURCE);" ^
     "$strategyText = $strategyText.Replace(([string][char]37 + 'MinecraftFilterWF' + [string][char]37), [string]$env:ZAPRET_MINECRAFT_FILTER_WF);" ^
@@ -314,6 +317,9 @@ powershell -NoProfile -Command ^
     "$strategyText = $strategyText.Replace(([string][char]37 + 'MinecraftFilterSkip' + [string][char]37), [string]$env:ZAPRET_MINECRAFT_FILTER_SKIP);" ^
     "$strategyText = $strategyText.Replace(([string][char]37 + 'WarpFilterSkip' + [string][char]37), [string]$env:ZAPRET_WARP_FILTER_SKIP);" ^
     "$strategyText = $strategyText.Replace(([string][char]37 + 'AutoHostlistSkip' + [string][char]37), [string]$env:ZAPRET_AUTOHOSTLIST_SKIP);" ^
+    "$strategyText = $strategyText.Replace(([string][char]37 + 'DNSFilterTCPWF' + [string][char]37), [string]$env:ZAPRET_DNS_FILTER_TCP_WF);" ^
+    "$strategyText = $strategyText.Replace(([string][char]37 + 'DNSFilterUDPWF' + [string][char]37), [string]$env:ZAPRET_DNS_FILTER_UDP_WF);" ^
+    "$strategyText = $strategyText.Replace(([string][char]37 + 'DNSFilterArgs' + [string][char]37), [string]$env:ZAPRET_DNS_FILTER_ARGS);" ^
     "[System.IO.File]::WriteAllText($env:ZAPRET_STRATEGY_TEMP, $strategyText, [System.Text.UTF8Encoding]::new($false))"
 if not exist "!ZAPRET_STRATEGY_TEMP!" (
     call :ui_print PrintRed "Failed to prepare strategy using the current fix settings." "Не удалось подготовить стратегию с текущими настройками фиксов."
